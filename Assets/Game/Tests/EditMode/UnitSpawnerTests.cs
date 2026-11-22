@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace BagManagementBattler.Tests
 {
-    public sealed class SoldierSpawnerTests
+    public sealed class UnitSpawnerTests
     {
         private readonly List<Object> createdObjects = new List<Object>();
 
@@ -27,10 +27,10 @@ namespace BagManagementBattler.Tests
         [Test]
         public void Spawn_InitializesUnitAtAnchor_AndReleaseResetsItForReuse()
         {
-            SoldierSpawner spawner = CreateSpawner(1, out Transform anchor);
+            UnitSpawner spawner = CreateSpawner(1, out Transform anchor);
             ProductionRequest request = CreateRequest(2f);
 
-            CombatUnit firstSpawn = spawner.Spawn(request);
+            CombatUnit firstSpawn = spawner.Spawn(request.ToLoadout());
 
             Assert.That(spawner.ActiveCount, Is.EqualTo(1));
             Assert.That(spawner.AvailableCount, Is.Zero);
@@ -53,7 +53,7 @@ namespace BagManagementBattler.Tests
             Assert.That(firstSpawn.Body.linearVelocity, Is.EqualTo(Vector2.zero));
             Assert.That(firstSpawn.transform.position, Is.EqualTo(anchor.position));
 
-            CombatUnit reused = spawner.Spawn(request);
+            CombatUnit reused = spawner.Spawn(request.ToLoadout());
             Assert.That(reused, Is.SameAs(firstSpawn));
             Assert.That(reused.IsInitialized, Is.True);
         }
@@ -61,11 +61,11 @@ namespace BagManagementBattler.Tests
         [Test]
         public void Spawn_ExpandsPoolWhenEveryPrewarmedUnitIsActive()
         {
-            SoldierSpawner spawner = CreateSpawner(1, out _);
+            UnitSpawner spawner = CreateSpawner(1, out _);
             ProductionRequest request = CreateRequest(1f);
 
-            CombatUnit first = spawner.Spawn(request);
-            CombatUnit second = spawner.Spawn(request);
+            CombatUnit first = spawner.Spawn(request.ToLoadout());
+            CombatUnit second = spawner.Spawn(request.ToLoadout());
 
             Assert.That(first, Is.Not.SameAs(second));
             Assert.That(spawner.ActiveCount, Is.EqualTo(2));
@@ -78,9 +78,9 @@ namespace BagManagementBattler.Tests
         [Test]
         public void Release_RejectsForeignAndAlreadyReleasedUnits()
         {
-            SoldierSpawner spawner = CreateSpawner(1, out _);
+            UnitSpawner spawner = CreateSpawner(1, out _);
             ProductionRequest request = CreateRequest(1f);
-            CombatUnit owned = spawner.Spawn(request);
+            CombatUnit owned = spawner.Spawn(request.ToLoadout());
 
             GameObject foreignObject = new GameObject("Foreign Soldier");
             createdObjects.Add(foreignObject);
@@ -91,7 +91,27 @@ namespace BagManagementBattler.Tests
             Assert.That(spawner.Release(owned), Is.False);
         }
 
-        private SoldierSpawner CreateSpawner(int prewarmCount, out Transform anchor)
+        [Test]
+        public void Spawn_RejectsAnotherTeamsLoadout_AndChangesNothing()
+        {
+            UnitSpawner spawner = CreateSpawner(1, out _);
+            UnitDefinition enemyDefinition = UnitDefinition.CreateTransient(
+                CombatTeam.Enemy,
+                UnitArchetype.Basic,
+                1,
+                1f);
+            createdObjects.Add(enemyDefinition);
+            var enemyLoadout = new CombatUnitLoadout(
+                enemyDefinition,
+                CreateRequest(1f).WeaponDefinition);
+
+            Assert.That(() => spawner.Spawn(enemyLoadout), Throws.ArgumentException);
+            Assert.That(() => spawner.Spawn(default), Throws.ArgumentException);
+            Assert.That(spawner.ActiveCount, Is.Zero);
+            Assert.That(spawner.AvailableCount, Is.EqualTo(1));
+        }
+
+        private UnitSpawner CreateSpawner(int prewarmCount, out Transform anchor)
         {
             GameObject prefabObject = new GameObject("Combat Soldier Prefab");
             createdObjects.Add(prefabObject);
@@ -104,8 +124,8 @@ namespace BagManagementBattler.Tests
 
             GameObject spawnerObject = new GameObject("Soldier Spawner");
             createdObjects.Add(spawnerObject);
-            SoldierSpawner spawner = spawnerObject.AddComponent<SoldierSpawner>();
-            spawner.Initialize(prefab, anchor, prewarmCount);
+            UnitSpawner spawner = spawnerObject.AddComponent<UnitSpawner>();
+            spawner.Initialize(CombatTeam.Friendly, prefab, anchor, prewarmCount);
             return spawner;
         }
 

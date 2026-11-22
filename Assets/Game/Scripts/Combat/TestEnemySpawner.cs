@@ -4,15 +4,13 @@ using UnityEngine;
 
 namespace BagManagementBattler.Combat
 {
+    /// <summary>Debug fixture: spawns one enemy through the enemy <see cref="UnitSpawner"/>.</summary>
     public sealed class TestEnemySpawner : MonoBehaviour
     {
-        [SerializeField] private CombatUnit unitPrefab;
-        [SerializeField] private Transform spawnAnchor;
+        [SerializeField] private UnitSpawner enemySpawner;
         [SerializeField] private UnitDefinition enemyDefinition;
         [SerializeField] private BagItemDefinition weaponDefinition;
         [SerializeField] private bool spawnOnStart = true;
-        [SerializeField] private float battlefieldMinY = float.NegativeInfinity;
-        [SerializeField] private float battlefieldMaxY = float.PositiveInfinity;
 
         public CombatUnit SpawnedUnit { get; private set; }
 
@@ -24,11 +22,6 @@ namespace BagManagementBattler.Combat
             }
         }
 
-        private void OnDrawGizmos()
-        {
-            CombatUnit.DrawBandGizmo(transform.position.x, battlefieldMinY, battlefieldMaxY);
-        }
-
         public CombatUnit Spawn()
         {
             if (SpawnedUnit != null)
@@ -37,36 +30,22 @@ namespace BagManagementBattler.Combat
             }
 
             ValidateReferences();
-            CombatUnit unit = Instantiate(unitPrefab, transform);
-            unit.name = "Test Enemy Unit";
-            unit.Initialize(
-                new CombatUnitLoadout(enemyDefinition, weaponDefinition),
-                spawnAnchor.position,
-                battlefieldMinY,
-                battlefieldMaxY);
-            SpawnedUnit = unit;
-            return unit;
+            SpawnedUnit = enemySpawner.Spawn(new CombatUnitLoadout(enemyDefinition, weaponDefinition));
+            return SpawnedUnit;
         }
 
         private void ValidateReferences()
         {
-            if (unitPrefab == null || spawnAnchor == null ||
-                enemyDefinition == null || weaponDefinition == null)
+            if (enemySpawner == null || enemyDefinition == null || weaponDefinition == null)
             {
                 throw new InvalidOperationException(
                     "The test enemy spawner is missing a required reference.");
             }
 
-            if (enemyDefinition.Team != CombatTeam.Enemy)
+            if (enemySpawner.Team != CombatTeam.Enemy)
             {
                 throw new InvalidOperationException(
-                    "The test enemy spawner requires an enemy unit definition.");
-            }
-
-            if (weaponDefinition.Role != BagItemRole.Weapon)
-            {
-                throw new InvalidOperationException(
-                    "The test enemy spawner requires a weapon definition.");
+                    "The test enemy spawner requires the enemy unit spawner.");
             }
         }
     }

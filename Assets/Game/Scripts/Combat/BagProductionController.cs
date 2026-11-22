@@ -2,12 +2,13 @@ using System;
 using System.Collections.Generic;
 using BagManagementBattler.Bag;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace BagManagementBattler.Combat
 {
     public sealed class BagProductionController : MonoBehaviour
     {
-        [SerializeField] private SoldierSpawner soldierSpawner;
+        [SerializeField, FormerlySerializedAs("soldierSpawner")] private UnitSpawner unitSpawner;
         [SerializeField, Tooltip("Temporary Task 2C fixture. GameFlow will begin production later.")]
         private bool autoBeginForDebug = true;
 
@@ -24,7 +25,7 @@ namespace BagManagementBattler.Combat
                 return;
             }
 
-            if (grid == null || soldierSpawner == null)
+            if (grid == null || unitSpawner == null)
             {
                 Debug.LogError("Production auto-begin is missing its bag grid or soldier spawner.", this);
                 enabled = false;
@@ -42,7 +43,7 @@ namespace BagManagementBattler.Combat
             }
         }
 
-        public void Initialize(BagGrid configuredGrid, SoldierSpawner configuredSpawner = null)
+        public void Initialize(BagGrid configuredGrid, UnitSpawner configuredSpawner = null)
         {
             if (grid != null)
             {
@@ -52,10 +53,10 @@ namespace BagManagementBattler.Combat
             grid = configuredGrid ?? throw new ArgumentNullException(nameof(configuredGrid));
             if (configuredSpawner != null)
             {
-                soldierSpawner = configuredSpawner;
+                unitSpawner = configuredSpawner;
             }
 
-            if (soldierSpawner == null)
+            if (unitSpawner == null)
             {
                 throw new InvalidOperationException("The production controller needs a soldier spawner.");
             }
@@ -68,7 +69,7 @@ namespace BagManagementBattler.Combat
                 throw new InvalidOperationException("Initialize the production controller before beginning.");
             }
 
-            if (!soldierSpawner.IsInitialized)
+            if (!unitSpawner.IsInitialized)
             {
                 throw new InvalidOperationException("Initialize the soldier spawner before beginning production.");
             }
@@ -91,7 +92,7 @@ namespace BagManagementBattler.Combat
             IReadOnlyList<ProductionRequest> requests = session.Tick(deltaTime);
             foreach (ProductionRequest request in requests)
             {
-                soldierSpawner.Spawn(request);
+                unitSpawner.Spawn(request.ToLoadout());
             }
         }
 

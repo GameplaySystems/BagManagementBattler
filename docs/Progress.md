@@ -24,12 +24,20 @@
 ## Now
 
 - **Milestone:** M0 Reset (ends Nov 24)
-- **Current task:** M1-1 (Queue #1 below).
+- **Current task:** M1-2 (Queue #1 below).
 - **Status:** not started
 - **Owner:** Claude
 - **Last updated:** 2026-11-22 by Claude
 
 ## Handoff notes
+
+- 2026-11-22 Claude: user confirmed the M1-1 scene check. Saving the scene did not rewrite the `soldierSpawner` key (Unity only reserializes dirty objects), so I renamed it to `unitSpawner` in the YAML by hand; `FormerlySerializedAs` stays for safety. Final run: **EditMode 38/38, PlayMode 16/16**; `git diff --check` clean. M1-1 moved to the Done log, committed and pushed. Next: M1-2.
+
+- 2026-11-22 Claude: `BagProductionController.soldierSpawner` → `unitSpawner` with `[FormerlySerializedAs("soldierSpawner")]`; the `GameScene` YAML key is left as `soldierSpawner` on purpose (the scene test passing proves the mapping; Unity rewrites it on the next scene save). `UnitSpawner.Spawn` on a wrong-team or default loadout throws `ArgumentException` (not silent, Unity logs it as an error), so no extra log added. M1-3 now lists `UnitSpawner.RecycleAll`; Design §3.4 row says recycle all: M1-3. Filtered run: EditMode `BagProductionControllerTests`+`UnitSpawnerTests` 7/7, PlayMode `GameSceneSoldierSpawnerTests` 1/1; full suites last ran before this rename (38/38, 16/16). Waiting for the user's scene check.
+
+- 2026-11-22 Claude, M1-1 done in code (not committed): `SoldierSpawner` → `UnitSpawner` via `git mv` (script GUID kept, so `GameScene` refs resolve); also `SoldierSpawnerTests` → `UnitSpawnerTests`. `UnitSpawner` has a serialized `team` (also the first `Initialize` param) and `Spawn(CombatUnitLoadout)`, which throws on another team or a default loadout and changes nothing; `BagProductionController` passes `request.ToLoadout()` (its serialized field is still named `soldierSpawner`, kept to avoid breaking the scene ref). `TestEnemySpawner` now only picks the enemy loadout and spawns it through an enemy `UnitSpawner` (team 1, prewarm 1, band −1.2…1.6, anchor `Enemy Spawn Point`) added to the `Test Enemy Spawner` GameObject in `GameScene`; its own prefab/anchor/band fields are gone (the band Gizmo comes from that `UnitSpawner`). Tests: new `Spawn_RejectsAnotherTeamsLoadout_AndChangesNothing` (EditMode); the `GameScene` test checks both spawner teams and that the enemy is in the enemy spawner's active set. Run 2026-11-22: **EditMode 38/38, PlayMode 16/16**; `git diff --check` clean; `GameScene` is the only build scene. Not built: "recycle all" (no caller yet). User check: enemy still appears at `Enemy Spawn Point` and fights; band Gizmo visible on both spawners.
+
+- 2026-11-22 Claude: started M1-1. Plan: `git mv` SoldierSpawner → UnitSpawner (GUID kept, so `GameScene` refs survive); serialized `team` + team check in `Spawn(CombatUnitLoadout)` (callers pass `request.ToLoadout()`); `TestEnemySpawner` keeps choosing the enemy loadout but spawns through a new enemy `UnitSpawner` on its GameObject (prefab, anchor, band move there); rename tests to match.
 
 - 2026-11-22 Claude: user confirmed the 3A.3 scene check; 3A.3 moved to the Done log. Known trade-off accepted: the waiting rule chains through ranks, so later units wait behind the crowd; queued 3A.5 (attack slots and retarget) after M1-2, and M1-2 now makes "Waiting" a proper unit state. `CLAUDE.md` removed from `.git/info/exclude` and committed with 3A.4 (amended, then pushed).
 
@@ -55,13 +63,12 @@
 
 ## Queue
 
-1. M1-1 — rename `SoldierSpawner` → `UnitSpawner` (one instance per team); enemy spawning through it; delete nothing else yet.
-2. M1-2 — `Health` + unit state machine (Idle, Walk, MeleeAttack, RangedAttack, Death); direct damage; white hit flash; weapon knockback and area-hit fields (with `Validate()` ranges and tests). "Waiting" (3A.4) becomes a proper unit state, not a flag. (Attack-range hysteresis moved to 3A.4.)
-3. **3A.5 — attack slots and retarget** (rule: `docs/Design.md` §3.7)
+1. M1-2 — `Health` + unit state machine (Idle, Walk, MeleeAttack, RangedAttack, Death); direct damage; white hit flash; weapon knockback and area-hit fields (with `Validate()` ranges and tests). "Waiting" (3A.4) becomes a proper unit state, not a flag. (Attack-range hysteresis moved to 3A.4.)
+2. **3A.5 — attack slots and retarget** (rule: `docs/Design.md` §3.7)
    - **Scope:** 6–8 melee slots on a ring around each target; a melee unit claims the nearest free slot and steers to that point; no free slot → retarget to the nearest enemy that has one; wait only if no enemy has a free slot. Ranged units never take slots. Slots are released on death, retarget and pool release (release-once).
    - **Why:** the 3A.4 waiting rule chains through ranks, so later units wait behind the crowd instead of moving to another target (accepted trade-off for now).
    - **Acceptance:** evaluate after M1-2 with real kills; close 3A.5 without building it if crowds already resolve.
-4. M1-3 — death → release at most once; `PlayerBase` + contact damage; WebGL portrait smoke build.
+3. M1-3 — death → release at most once; `UnitSpawner.RecycleAll` (wave cleanup: release every active unit once, safe when a death release lands in the same frame); `PlayerBase` + contact damage; WebGL portrait smoke build.
 
 ## Done log
 
@@ -74,3 +81,4 @@
 | 3A.2 | 2D edge-to-edge range (`EdgeGapTo`), diagonal chase, battlefield Y band on both spawners (−1.2…1.6 in `GameScene`), enemy spawn moved to y 1.112 | `237cb29` |
 | 3A.3 | collider-distance range, 2D throttled same-team separation, band Gizmos, sorting layers + `SortingGroup` + custom sort axis | `95e86fc` |
 | 3A.4 | crowd stability: engagement hysteresis, velocity smoothing, separation dead zone, opponent non-overlap (push + per-step guard), waiting behind resting teammates | commit "Task 3A.4: crowd stability" |
+| M1-1 | `SoldierSpawner` → `UnitSpawner` (GUID kept), one instance per team with a team check in `Spawn(CombatUnitLoadout)`, test enemy spawned through the enemy `UnitSpawner`, `BagProductionController.unitSpawner` (`FormerlySerializedAs`) | commit "M1-1: UnitSpawner per team" |

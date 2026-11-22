@@ -24,7 +24,7 @@ namespace BagManagementBattler.Tests
             Assert.That(spawnerObject, Is.Not.Null);
             Assert.That(enemySpawnerObject, Is.Not.Null);
 
-            SoldierSpawner spawner = spawnerObject.GetComponent<SoldierSpawner>();
+            UnitSpawner spawner = spawnerObject.GetComponent<UnitSpawner>();
             BagProductionController controller =
                 spawnerObject.GetComponent<BagProductionController>();
             Assert.That(spawner, Is.Not.Null);
@@ -34,6 +34,11 @@ namespace BagManagementBattler.Tests
             Assert.That(enemySpawner, Is.Not.Null);
             Assert.That(enemySpawner.SpawnedUnit, Is.Not.Null);
             Assert.That(enemySpawner.SpawnedUnit.Team, Is.EqualTo(CombatTeam.Enemy));
+            UnitSpawner enemyUnitSpawner = enemySpawnerObject.GetComponent<UnitSpawner>();
+            Assert.That(enemyUnitSpawner, Is.Not.Null);
+            Assert.That(enemyUnitSpawner.Team, Is.EqualTo(CombatTeam.Enemy));
+            Assert.That(enemyUnitSpawner.ActiveUnits, Does.Contain(enemySpawner.SpawnedUnit));
+            Assert.That(spawner.Team, Is.EqualTo(CombatTeam.Friendly));
             Assert.That(spawner.IsInitialized, Is.True);
             Assert.That(controller.IsProducing, Is.True);
             Assert.That(controller.ActiveWeaponCount, Is.EqualTo(2));
@@ -142,7 +147,7 @@ namespace BagManagementBattler.Tests
             for (int index = 0; index < reusedUnits.Length; index++)
             {
                 reusedUnits[index] = spawner.Spawn(
-                    new ProductionRequest(soldierDefinition, crowbarDefinition));
+                    new ProductionRequest(soldierDefinition, crowbarDefinition).ToLoadout());
                 AssertConfiguredWeaponVisual(reusedUnits[index]);
             }
 
@@ -152,7 +157,7 @@ namespace BagManagementBattler.Tests
             }
         }
 
-        private static CombatUnit FindActiveUnit(SoldierSpawner spawner, string weaponTypeId)
+        private static CombatUnit FindActiveUnit(UnitSpawner spawner, string weaponTypeId)
         {
             foreach (CombatUnit unit in spawner.ActiveUnits)
             {

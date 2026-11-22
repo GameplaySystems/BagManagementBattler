@@ -92,12 +92,12 @@ namespace BagManagementBattler.Tests
             prefabObject.GetComponent<CapsuleCollider2D>().size = new Vector2(0.21f, 0.4f);
             GameObject anchorObject = new GameObject("Separation Anchor");
             GameObject spawnerObject = new GameObject("Separation Spawner");
-            SoldierSpawner spawner = spawnerObject.AddComponent<SoldierSpawner>();
-            spawner.Initialize(prefab, anchorObject.transform, 2);
+            UnitSpawner spawner = spawnerObject.AddComponent<UnitSpawner>();
+            spawner.Initialize(CombatTeam.Friendly, prefab, anchorObject.transform, 2);
 
             ProductionRequest request = new ProductionRequest(soldier, weapon);
-            CombatUnit first = spawner.Spawn(request);
-            CombatUnit second = spawner.Spawn(request);
+            CombatUnit first = spawner.Spawn(request.ToLoadout());
+            CombatUnit second = spawner.Spawn(request.ToLoadout());
             Assert.That(second, Is.Not.SameAs(first));
 
             for (int step = 0; step < 50; step++)

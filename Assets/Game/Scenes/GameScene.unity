@@ -330,7 +330,8 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 62487cc9fcef445cbd00f7930d61d999, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: BagManagementBattler.Runtime::BagManagementBattler.Combat.SoldierSpawner
+  m_EditorClassIdentifier: BagManagementBattler.Runtime::BagManagementBattler.Combat.UnitSpawner
+  team: 0
   unitPrefab: {fileID: 4979877340442591965, guid: f3fcab22a89afd24999200548d6cdb55, type: 3}
   spawnAnchor: {fileID: 521983373}
   prewarmCount: 4
@@ -364,7 +365,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9321f517463d4d248e6aa760ef20f476, type: 3}
   m_Name: 
   m_EditorClassIdentifier: BagManagementBattler.Runtime::BagManagementBattler.Combat.BagProductionController
-  soldierSpawner: {fileID: 1074557423}
+  unitSpawner: {fileID: 1074557423}
   autoBeginForDebug: 1
 --- !u!1 &1558724107
 GameObject:
@@ -568,6 +569,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2100000001}
   - component: {fileID: 2100000002}
+  - component: {fileID: 2100000005}
   m_Layer: 0
   m_Name: Test Enemy Spawner
   m_TagString: Untagged
@@ -603,11 +605,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 395a1da83f554635a1bc16cce24fc155, type: 3}
   m_Name: 
   m_EditorClassIdentifier: BagManagementBattler.Runtime::BagManagementBattler.Combat.TestEnemySpawner
-  unitPrefab: {fileID: 4979877340442591965, guid: f3fcab22a89afd24999200548d6cdb55, type: 3}
-  spawnAnchor: {fileID: 2100000004}
+  enemySpawner: {fileID: 2100000005}
   enemyDefinition: {fileID: 11400000, guid: b42c8d520d624df098cf34aee4afe201, type: 2}
   weaponDefinition: {fileID: 11400000, guid: 081abce14ab34faca2a85685f432479e, type: 2}
   spawnOnStart: 1
+--- !u!114 &2100000005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2100000000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62487cc9fcef445cbd00f7930d61d999, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: BagManagementBattler.Runtime::BagManagementBattler.Combat.UnitSpawner
+  team: 1
+  unitPrefab: {fileID: 4979877340442591965, guid: f3fcab22a89afd24999200548d6cdb55, type: 3}
+  spawnAnchor: {fileID: 2100000004}
+  prewarmCount: 1
+  spawnLaneSpacing: 0.15
   battlefieldMinY: -1.2
   battlefieldMaxY: 1.6
 --- !u!1 &2100000003

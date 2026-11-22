@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
-using BagManagementBattler.Bag;
 using UnityEngine;
 
 namespace BagManagementBattler.Combat
 {
-    public sealed class SoldierSpawner : MonoBehaviour
+    /// <summary>Pools and spawns the units of one team; the scene has one instance per team.</summary>
+    public sealed class UnitSpawner : MonoBehaviour
     {
+        [SerializeField] private CombatTeam team;
         [SerializeField] private CombatUnit unitPrefab;
         [SerializeField] private Transform spawnAnchor;
         [SerializeField, Min(0)] private int prewarmCount = 4;
@@ -20,6 +21,7 @@ namespace BagManagementBattler.Combat
         private bool initialized;
         private int spawnCount;
 
+        public CombatTeam Team => team;
         public int ActiveCount => activeUnits.Count;
         public int AvailableCount => availableUnits.Count;
         public IReadOnlyCollection<CombatUnit> ActiveUnits => activeUnits;
@@ -29,7 +31,7 @@ namespace BagManagementBattler.Combat
         {
             if (unitPrefab != null && spawnAnchor != null)
             {
-                Initialize(unitPrefab, spawnAnchor, prewarmCount);
+                Initialize(team, unitPrefab, spawnAnchor, prewarmCount);
             }
         }
 
@@ -47,24 +49,26 @@ namespace BagManagementBattler.Combat
 
             if (unitPrefab == null || spawnAnchor == null)
             {
-                Debug.LogError("Soldier spawner is missing its prefab or spawn anchor.", this);
+                Debug.LogError("Unit spawner is missing its prefab or spawn anchor.", this);
                 enabled = false;
                 return;
             }
 
-            Initialize(unitPrefab, spawnAnchor, prewarmCount);
+            Initialize(team, unitPrefab, spawnAnchor, prewarmCount);
         }
 
         public void Initialize(
+            CombatTeam configuredTeam,
             CombatUnit configuredPrefab,
             Transform configuredSpawnAnchor,
             int configuredPrewarmCount = 4)
         {
             if (initialized)
             {
-                throw new InvalidOperationException("The soldier spawner is already initialized.");
+                throw new InvalidOperationException("The unit spawner is already initialized.");
             }
 
+            team = configuredTeam;
             unitPrefab = configuredPrefab != null
                 ? configuredPrefab
                 : throw new ArgumentNullException(nameof(configuredPrefab));
@@ -85,9 +89,13 @@ namespace BagManagementBattler.Combat
             }
         }
 
-        public CombatUnit Spawn(ProductionRequest request)
+        public CombatUnit Spawn(CombatUnitLoadout loadout)
         {
             EnsureInitialized();
+            if (loadout.UnitDefinition == null || loadout.UnitDefinition.Team != team)
+            {
+                throw new ArgumentException($"This spawner only spawns {team} units.", nameof(loadout));
+            }
 
             CombatUnit unit = availableUnits.Count > 0
                 ? availableUnits.Dequeue()
@@ -96,7 +104,7 @@ namespace BagManagementBattler.Combat
             int lane = spawnCount++ % 3;
             float laneOffset = lane == 0 ? 0f : (lane == 1 ? spawnLaneSpacing : -spawnLaneSpacing);
             unit.Initialize(
-                request.ToLoadout(),
+                loadout,
                 spawnAnchor.position + Vector3.up * laneOffset,
                 battlefieldMinY,
                 battlefieldMaxY);
@@ -134,7 +142,7 @@ namespace BagManagementBattler.Combat
         {
             if (!initialized)
             {
-                throw new InvalidOperationException("Initialize the soldier spawner before use.");
+                throw new InvalidOperationException("Initialize the unit spawner before use.");
             }
         }
     }

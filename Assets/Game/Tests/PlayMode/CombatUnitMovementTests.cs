@@ -45,11 +45,11 @@ namespace BagManagementBattler.Tests
             GameObject anchorObject = new GameObject("Tent Anchor");
             anchorObject.transform.position = new Vector3(-2.5f, 0.3f, 0f);
             GameObject spawnerObject = new GameObject("Soldier Spawner");
-            SoldierSpawner spawner = spawnerObject.AddComponent<SoldierSpawner>();
-            spawner.Initialize(prefab, anchorObject.transform, 1);
+            UnitSpawner spawner = spawnerObject.AddComponent<UnitSpawner>();
+            spawner.Initialize(CombatTeam.Friendly, prefab, anchorObject.transform, 1);
 
             CombatUnit unit = spawner.Spawn(
-                new ProductionRequest(soldierDefinition, weaponDefinition));
+                new ProductionRequest(soldierDefinition, weaponDefinition).ToLoadout());
             float startingX = unit.transform.position.x;
 
             // Velocity eases in (2 speed x 10/s response x 0.02 s = 0.4 per step), so wait past the ramp.

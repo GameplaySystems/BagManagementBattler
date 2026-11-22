@@ -32,7 +32,7 @@ namespace BagManagementBattler.Tests
             BagItemDefinition weapon = CreateDefinition("weapon", BagItemRole.Weapon, 1f);
             Place(grid, weapon, Vector2Int.zero);
             Place(grid, soldier, Vector2Int.right);
-            SoldierSpawner spawner = CreateSpawner();
+            UnitSpawner spawner = CreateSpawner();
             BagProductionController controller = CreateController(grid, spawner);
 
             controller.BeginProduction();
@@ -51,7 +51,7 @@ namespace BagManagementBattler.Tests
             BagItemDefinition weapon = CreateDefinition("weapon", BagItemRole.Weapon, 2f);
             Place(grid, weapon, Vector2Int.zero);
             Place(grid, soldier, Vector2Int.right);
-            SoldierSpawner spawner = CreateSpawner();
+            UnitSpawner spawner = CreateSpawner();
             BagProductionController controller = CreateController(grid, spawner);
             List<WeaponProductionProgress> progress = new List<WeaponProductionProgress>();
 
@@ -77,7 +77,7 @@ namespace BagManagementBattler.Tests
         {
             BagGrid grid = CreateGrid();
             Place(grid, CreateDefinition("weapon", BagItemRole.Weapon, 1f), Vector2Int.zero);
-            SoldierSpawner spawner = CreateSpawner();
+            UnitSpawner spawner = CreateSpawner();
             BagProductionController controller = CreateController(grid, spawner);
 
             controller.BeginProduction();
@@ -87,7 +87,7 @@ namespace BagManagementBattler.Tests
             Assert.That(spawner.ActiveCount, Is.Zero);
         }
 
-        private BagProductionController CreateController(BagGrid grid, SoldierSpawner spawner)
+        private BagProductionController CreateController(BagGrid grid, UnitSpawner spawner)
         {
             GameObject controllerObject = new GameObject("Production Controller");
             createdObjects.Add(controllerObject);
@@ -97,7 +97,7 @@ namespace BagManagementBattler.Tests
             return controller;
         }
 
-        private SoldierSpawner CreateSpawner()
+        private UnitSpawner CreateSpawner()
         {
             GameObject prefabObject = new GameObject("Combat Soldier Prefab");
             createdObjects.Add(prefabObject);
@@ -106,8 +106,8 @@ namespace BagManagementBattler.Tests
             createdObjects.Add(anchorObject);
             GameObject spawnerObject = new GameObject("Spawner");
             createdObjects.Add(spawnerObject);
-            SoldierSpawner spawner = spawnerObject.AddComponent<SoldierSpawner>();
-            spawner.Initialize(prefab, anchorObject.transform, 0);
+            UnitSpawner spawner = spawnerObject.AddComponent<UnitSpawner>();
+            spawner.Initialize(CombatTeam.Friendly, prefab, anchorObject.transform, 0);
             return spawner;
         }
 

@@ -259,8 +259,8 @@ Namespaces: `BagManagementBattler.Bag`, `.Combat`, `.Flow`, `.Economy`, `.UI`, `
 | `CombatUnit` | MB | one unit: initialize, own state machine, movement, targeting; mirrors its visual root for the enemy team; movement per 3.7 | movement and targeting done (3A.2–3A.4); states/attacks: M1-2 |
 | `UnitVisualLayout` | static | visual sizing helper | done |
 | `BagProductionController` | MB | session lifecycle, ticking, forwards requests | done |
-| `SoldierSpawner` → **`UnitSpawner`** | MB | pool, acquire/init/release, track active, recycle all; one instance per team | rename + generalize: next |
-| `TestEnemySpawner` | MB | debug fixture | delete when `WaveRunner` lands |
+| `UnitSpawner` | MB | pool, acquire/init/release, track active, recycle all; one instance per team (serialized `team`; `Spawn(CombatUnitLoadout)` rejects other teams) | rename + per-team done (M1-1, scene check passed); recycle all: M1-3 |
+| `TestEnemySpawner` | MB | debug fixture: picks one enemy loadout and spawns it through the enemy `UnitSpawner` | delete when `WaveRunner` lands |
 | `Health` | C# | current/max, damage, `Depleted` event | next |
 | `UnitStateMachine`, `IUnitState` + 5 states | C# | Idle, Walk, MeleeAttack, RangedAttack, Death | next |
 | `PlayerBase` | MB | base `Health`, enemy contact | next |
