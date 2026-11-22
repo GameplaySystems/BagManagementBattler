@@ -256,7 +256,7 @@ Namespaces: `BagManagementBattler.Bag`, `.Combat`, `.Flow`, `.Economy`, `.UI`, `
 |---|---|---|---|
 | `UnitDefinition`, `UnitCatalog` | SO | per-team/archetype/level body stats and visuals | done (HP: next) |
 | `CombatUnitLoadout` | value | unit def + weapon def → final stats | done |
-| `CombatUnit` | MB | one unit: initialize, own state machine, movement, targeting; mirrors its visual root for the enemy team; movement per 3.7 | done (2D chase/band: 3A.2; states/attacks: next) |
+| `CombatUnit` | MB | one unit: initialize, own state machine, movement, targeting; mirrors its visual root for the enemy team; movement per 3.7 | movement and targeting done (3A.2); states/attacks: M1-2 |
 | `UnitVisualLayout` | static | visual sizing helper | done |
 | `BagProductionController` | MB | session lifecycle, ticking, forwards requests | done |
 | `SoldierSpawner` → **`UnitSpawner`** | MB | pool, acquire/init/release, track active, recycle all; one instance per team | rename + generalize: next |
@@ -317,11 +317,11 @@ Owned by `CombatUnit` and applied through its kinematic `Rigidbody2D` velocity e
 - **Range** is a 2D edge-to-edge distance: centre distance minus both units' collider radii (half the collider width). A unit is in range when that distance ≤ its weapon's engagement range. Melee ranges are therefore near zero and mean "touching".
 - **With a target:** the unit steers straight toward the target on both axes (normalised direction × movement speed) until in range, then stops.
 - **Without a target:** the unit advances along X only (friendly +X, enemy −X).
-- **Battlefield band:** Y is clamped to the battlefield's min/max Y every step; no unit ever leaves the band.
+- **Battlefield band:** Y is clamped to the battlefield's min/max Y every step (spawn Y included); no unit ever leaves the band. The band is serialized on each spawner (`battlefieldMinY`/`battlefieldMaxY`, set in `GameScene`) and passed to `CombatUnit.Initialize`.
 - **Same-team separation** stays: a small push between nearby units of the same team, added on top of the move.
 - **No pathfinding** (see 1.14): no obstacle avoidance or routing, just straight steering plus separation.
 
-Status: rule adopted 2026-11-22. Current code still measures range on X only and chases on X only; Task 3A.2 brings it in line.
+Status: implemented in Task 3A.2; scene check passed 2026-11-22.
 
 ---
 
@@ -354,4 +354,4 @@ Scope rule: if a milestone slips by more than one day, cut from M3 content or 1.
 | Enemy faces the wrong way | No mirroring exists anywhere. | Flip the `Visual` child root's X scale for `CombatTeam.Enemy` (includes `HandPoint` and weapon); keep collider/rigidbody on the unflipped root. Reset on pool release. |
 | Bag soldier head/body sorting wrong | `BagBoardView.CreateItemVisualPart` gives every part `sortingOrder = 22`, so head and body tie. | Pass a sorting order per part (body 22, head 23). Container view is unaffected (UI sibling order). |
 
-Status: all fixes done; scene check passed after tuning (2026-11-22). The follow-up is Task 3A.2 (circular range and 2D chase, see 3.7).
+Status: all fixes done; scene check passed after tuning (2026-11-22). Follow-up Task 3A.2 (circular range and 2D chase, see 3.7) is done too.

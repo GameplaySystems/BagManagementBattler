@@ -24,18 +24,14 @@
 ## Now
 
 - **Milestone:** M0 Reset (ends Nov 24)
-- **Current task:** 3A.2 — circular range and 2D chase (scope/tests: Queue #1 below, rule: `docs/Design.md` §3.7)
-- **Status:** implemented and committed ("Task 3A.2: circular range and 2D chase"); waiting for the user to confirm the manual `GameScene` check.
-- **Owner:** Claude
+- **Current task:** none. Next is Queue #1 (M1-1): promote it when starting.
+- **Status:** 3A.2 done and committed (`237cb29`); scene check passed
+- **Owner:** —
 - **Last updated:** 2026-11-22 by Claude
 
 ## Handoff notes
 
-- 2026-11-22 Claude: 3A.2 implemented, uncommitted. `CombatUnit`: public `EdgeGapTo` (2D centre distance minus both half-widths), steering `normalized × speed` toward the target, X-only advance without one, vertical step clamped to the band each fixed step, spawn Y clamped, band reset on `ResetForPool`. `Initialize(loadout, pos, minY = -inf, maxY = +inf)` rejects NaN or min > max. Both spawners have serialized `battlefieldMinY/MaxY`; `GameScene` sets −1.2 / 1.6 on both, estimated from the road in the background sprite (road ≈ y −1.43…1.87). Tune it in the scene check.
-- New tests in `CombatUnitMovementTests`: a unit keeps moving when only the X edges meet, a Y-offset target is reached on the 2D gap, units never leave the band (separation plus a high target plus a spawn above the band), and an inverted band is rejected. `GameSceneSoldierSpawnerTests` now uses `EdgeGapTo` with +0.03 upper slack (see Found, not fixed).
-- Run 2026-11-22 after the final edit: EditMode 35/35 passed, PlayMode 11/11 passed; `git diff --check` clean; scene diff is only the 4 band lines.
-- After that run, the user moved `Enemy Spawn Point` to y 1.112 in `GameScene` (Editor save also wrote `spawnLaneSpacing: 0.15` explicitly). This is committed with 3A.2, but tests were **not** rerun on it (Editor was open). Rerun PlayMode first next session.
-- Still open: the user's manual `GameScene` check (crowbar walks diagonally to the enemy and touches it; nobody leaves the band). Then commit, Done log, Design §3.4/§3.7 status, promote M1-1.
+- 2026-11-22 Claude: 3A.2 closed after the user's scene check passed. Design §3.4 `CombatUnit` row and §3.7 status updated. Last test run (EditMode 35/35, PlayMode 11/11) was **before** the user moved `Enemy Spawn Point` to y 1.112; rerun PlayMode at the start of M1-1.
 - 2026-11-22 Claude: 3A.1 closed after the user's scene check, which passed after the user's own config tuning (crowbar 2 s / range 0.15, rifle range 2). Design §1.9 now matches the configs, and §3.7 holds the new movement rule.
 - `GameSceneSoldierSpawnerTests` now waits for the first crowbar and the first rifle unit instead of fixed seconds, so retuning durations no longer breaks it.
 - Final 3A.1 run, after the user's tuning and the test rewrite (2026-11-22): EditMode 35/35 passed, PlayMode 7/7 passed; `git diff --check` clean.
@@ -48,17 +44,9 @@
 
 ## Queue
 
-1. **3A.2 — circular range and 2D chase** (rule: `docs/Design.md` §3.7)
-   - **Scope:** in `CombatUnit`, range becomes 2D edge to edge (centre distance minus both collider radii, radius = half the collider width). With a target, steer straight toward it on both axes until in range. Without one, advance along X. Clamp Y to the battlefield band (serialized min/max Y, set in `GameScene`). Keep same-team separation. No pathfinding.
-   - **Out of scope:** attacks, damage, states, `UnitSpawner` rename.
-   - **Tests:**
-     - a melee unit stops only when touching (edge distance ≤ its tiny range, not before);
-     - a target offset on Y still gets reached (in range on the 2D distance);
-     - Y never leaves the band, even with separation pushing.
-   - **Acceptance:** those three tests; EditMode + PlayMode pass; `git diff --check` clean; manual `GameScene` check (crowbar walks to the enemy diagonally and touches it; nobody leaves the band).
-2. M1-1 — rename `SoldierSpawner` → `UnitSpawner` (one instance per team); enemy spawning through it; delete nothing else yet.
-3. M1-2 — `Health` + unit state machine (Idle, Walk, MeleeAttack, RangedAttack, Death); direct damage; white hit flash.
-4. M1-3 — death → release at most once; `PlayerBase` + contact damage; WebGL portrait smoke build.
+1. M1-1 — rename `SoldierSpawner` → `UnitSpawner` (one instance per team); enemy spawning through it; delete nothing else yet.
+2. M1-2 — `Health` + unit state machine (Idle, Walk, MeleeAttack, RangedAttack, Death); direct damage; white hit flash.
+3. M1-3 — death → release at most once; `PlayerBase` + contact damage; WebGL portrait smoke build.
 
 ## Done log
 
@@ -68,3 +56,4 @@
 | 2A–2D | adjacency production, pooled spawning, fills, hand-anchored weapons | (in history) |
 | 3A | shared `CombatUnit`, `UnitCatalog`, targeting and chase | `15c7028`, `2886553` |
 | 3A.1 | field-scale `Visual` root, enemy mirroring, edge-to-edge X range, spawn lanes + separation, tuned rifle/crowbar configs, bag head sorting | commit "Task 3A.1: combat visual and movement fixes" |
+| 3A.2 | 2D edge-to-edge range (`EdgeGapTo`), diagonal chase, battlefield Y band on both spawners (−1.2…1.6 in `GameScene`), enemy spawn moved to y 1.112 | `237cb29` |
