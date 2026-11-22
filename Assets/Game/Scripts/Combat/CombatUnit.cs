@@ -13,7 +13,12 @@ namespace BagManagementBattler.Combat
         [SerializeField, Min(0.1f)] private float acquisitionRange = 20f;
         [SerializeField, Min(0.02f)] private float targetRefreshInterval = 0.1f;
         [SerializeField, Min(0.01f)] private float separationRadius = 0.45f;
+        [SerializeField, Min(0.001f)] private float separationGap = 0.05f;
         [SerializeField, Min(0f)] private float separationSpeed = 1.5f;
+        [SerializeField, Min(0.02f)] private float separationInterval = 0.1f;
+
+        // Separation never exceeds this share of the move speed, so steering toward a target wins.
+        private const float MaxSeparationShareOfSpeed = 0.5f;
 
         private readonly List<SpriteRenderer> unitVisualRenderers =
             new List<SpriteRenderer>();
@@ -23,6 +28,8 @@ namespace BagManagementBattler.Combat
         private CapsuleCollider2D bodyCollider;
         private CombatUnit currentTarget;
         private float nextTargetRefreshTime;
+        private Vector2 separationVelocity;
+        private float nextSeparationTime;
         private float bandMinY = float.NegativeInfinity;
         private float bandMaxY = float.PositiveInfinity;
 
@@ -34,8 +41,6 @@ namespace BagManagementBattler.Combat
         public Rigidbody2D Body => body;
         public Transform VisualRoot => visualRoot;
         public Transform HandPoint => handPoint;
-        public float HalfWidth =>
-            bodyCollider.size.x * 0.5f * Mathf.Abs(transform.lossyScale.x);
         public CombatUnit CurrentTarget => currentTarget;
         public bool IsInitialized { get; private set; }
 
@@ -53,7 +58,13 @@ namespace BagManagementBattler.Combat
             }
 
             RefreshTargetIfNeeded();
-            Vector2 velocity = ResolveMoveVelocity() + Vector2.up * ResolveSeparationVelocity();
+            if (Time.time >= nextSeparationTime)
+            {
+                separationVelocity = ResolveSeparationVelocity();
+                nextSeparationTime = Time.time + separationInterval;
+            }
+
+            Vector2 velocity = ResolveMoveVelocity() + separationVelocity;
             // Limit the vertical step so the next position stays inside the battlefield band.
             float currentY = body.position.y;
             float nextY = Mathf.Clamp(currentY + velocity.y * Time.fixedDeltaTime, bandMinY, bandMaxY);
@@ -98,9 +109,13 @@ namespace BagManagementBattler.Combat
             spawnPosition.y = Mathf.Clamp(spawnPosition.y, minY, maxY);
 
             transform.SetPositionAndRotation(spawnPosition, Quaternion.identity);
+            // Move the physics body too, so collider queries see the spawn position right away.
+            body.position = spawnPosition;
             body.linearVelocity = Vector2.zero;
             currentTarget = null;
             nextTargetRefreshTime = 0f;
+            separationVelocity = Vector2.zero;
+            nextSeparationTime = 0f;
             SetVisualFacing(UnitDefinition.Team == CombatTeam.Enemy ? -1f : 1f);
             ConfigureUnitVisuals();
             ConfigureWeaponVisual();
@@ -126,7 +141,10 @@ namespace BagManagementBattler.Combat
             IsInitialized = false;
             body.linearVelocity = Vector2.zero;
             transform.SetPositionAndRotation(pooledPosition, Quaternion.identity);
+            body.position = pooledPosition;
             currentTarget = null;
+            separationVelocity = Vector2.zero;
+            nextSeparationTime = 0f;
             UnitDefinition = null;
             WeaponDefinition = null;
             MovementSpeed = 0f;
@@ -194,10 +212,27 @@ namespace BagManagementBattler.Combat
                    candidate.Team != Team;
         }
 
+        /// <summary>Scene-view lines at the battlefield band's min/max Y, drawn by the spawners.</summary>
+        internal static void DrawBandGizmo(float centreX, float minY, float maxY)
+        {
+            const float halfLength = 6f;
+            Gizmos.color = Color.yellow;
+            foreach (float y in new[] { minY, maxY })
+            {
+                if (!float.IsInfinity(y))
+                {
+                    Gizmos.DrawLine(
+                        new Vector3(centreX - halfLength, y, 0f),
+                        new Vector3(centreX + halfLength, y, 0f));
+                }
+            }
+        }
+
+        /// <summary>Collider edge-to-edge distance; negative while the bodies overlap.</summary>
         public float EdgeGapTo(CombatUnit other)
         {
-            float centreDistance = Vector2.Distance(transform.position, other.transform.position);
-            return centreDistance - HalfWidth - other.HalfWidth;
+            ColliderDistance2D distance = Physics2D.Distance(bodyCollider, other.bodyCollider);
+            return distance.isValid ? distance.distance : float.PositiveInfinity;
         }
 
         private Vector2 ResolveMoveVelocity()
@@ -216,14 +251,14 @@ namespace BagManagementBattler.Combat
             return new Vector2(Team == CombatTeam.Friendly ? MovementSpeed : -MovementSpeed, 0f);
         }
 
-        private float ResolveSeparationVelocity()
+        private Vector2 ResolveSeparationVelocity()
         {
             int candidateCount = Physics2D.OverlapCircle(
-                transform.position,
+                body.position,
                 separationRadius,
                 ContactFilter2D.noFilter,
                 targetCandidates);
-            float push = 0f;
+            Vector2 push = Vector2.zero;
 
             for (int index = 0; index < candidateCount; index++)
             {
@@ -236,22 +271,23 @@ namespace BagManagementBattler.Combat
                     continue;
                 }
 
-                Vector2 offset = (Vector2)transform.position - (Vector2)other.transform.position;
-                float distance = offset.magnitude;
-                if (distance >= separationRadius)
+                float gap = EdgeGapTo(other);
+                if (gap >= separationGap)
                 {
                     continue;
                 }
 
-                // Units on the same lane get a stable up/down split instead of cancelling out.
-                float direction = Mathf.Abs(offset.y) > 0.0001f
-                    ? Mathf.Sign(offset.y)
-                    : (GetInstanceID() > other.GetInstanceID() ? 1f : -1f);
-                push += direction * (1f - distance / separationRadius);
+                Vector2 offset = body.position - other.body.position;
+                // Units on the same spot get a stable up/down split instead of cancelling out.
+                Vector2 direction = offset.sqrMagnitude > 0.00000001f
+                    ? offset.normalized
+                    : (GetInstanceID() > other.GetInstanceID() ? Vector2.up : Vector2.down);
+                push += direction * Mathf.Clamp01((separationGap - gap) / separationGap);
             }
 
-            // shortcut: vertical-only push, no crowd solver; revisit if large waves pile up.
-            return push * separationSpeed;
+            return Vector2.ClampMagnitude(
+                push * separationSpeed,
+                MovementSpeed * MaxSeparationShareOfSpeed);
         }
 
         private void SetVisualFacing(float sign)

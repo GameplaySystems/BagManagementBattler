@@ -55,7 +55,18 @@ namespace BagManagementBattler.Tests
             Assert.That(bagSoldier.Find("Visual 1")
                 .GetComponent<SpriteRenderer>().sortingOrder, Is.EqualTo(23));
 
+            Assert.That(rifleFill.sortingLayerName, Is.EqualTo("Bag"));
+            Assert.That(tent.GetComponent<SpriteRenderer>().sortingLayerName, Is.EqualTo("Battlefield"));
+            Assert.That(
+                GameObject.Find("Cartoon battlefield with yellow dirt road")
+                    .GetComponent<SpriteRenderer>().sortingLayerName,
+                Is.EqualTo("Background"));
+
             CombatUnit enemyUnit = enemySpawner.SpawnedUnit;
+            UnityEngine.Rendering.SortingGroup enemyGroup =
+                enemyUnit.GetComponent<UnityEngine.Rendering.SortingGroup>();
+            Assert.That(enemyGroup, Is.Not.Null);
+            Assert.That(enemyGroup.sortingLayerName, Is.EqualTo("Battlefield"));
             Assert.That(enemyUnit.VisualRoot.localScale.x, Is.LessThan(0f));
             Assert.That(Mathf.Abs(enemyUnit.VisualRoot.localScale.x), Is.LessThan(1f));
             Assert.That(enemyUnit.transform.localScale.x, Is.GreaterThan(0f));
@@ -95,12 +106,13 @@ namespace BagManagementBattler.Tests
             Assert.That(rifleUnit.CurrentTarget, Is.SameAs(enemyUnit));
             Assert.That(enemyUnit.CurrentTarget, Is.Not.Null);
             Assert.That(crowbarUnit.CurrentTarget, Is.SameAs(enemyUnit));
-            Assert.That(crowbarUnit.Body.linearVelocity.x, Is.EqualTo(0f));
-            // Upper slack: same-team separation may nudge a stopped unit on Y by one fixed step.
-            float crowbarEdgeGap = crowbarUnit.EdgeGapTo(enemyUnit);
+            // Later crowbars crowd in and their separation may push the stopped one (at most half
+            // its speed), so check "not steering" and "in range" instead of zero velocity.
             Assert.That(
-                crowbarEdgeGap,
-                Is.InRange(crowbarUnit.EngagementRange - 0.05f, crowbarUnit.EngagementRange + 0.03f));
+                crowbarUnit.Body.linearVelocity.magnitude,
+                Is.LessThanOrEqualTo(crowbarUnit.MovementSpeed * 0.5f + 0.001f));
+            float crowbarEdgeGap = crowbarUnit.EdgeGapTo(enemyUnit);
+            Assert.That(crowbarEdgeGap, Is.InRange(-0.1f, crowbarUnit.EngagementRange + 0.03f));
             int pooledCount = spawner.ActiveCount + spawner.AvailableCount;
 
             UnitDefinition unitDefinition = rifleUnit.UnitDefinition;

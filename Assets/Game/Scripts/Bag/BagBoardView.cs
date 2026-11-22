@@ -7,6 +7,7 @@ namespace BagManagementBattler.Bag
 {
     public sealed class BagBoardView : MonoBehaviour
     {
+        private const string BagSortingLayer = "Bag";
         private static readonly Color CellColor = new Color(0.75f, 0.86f, 1f, 0.9f);
         private static readonly Color ValidColor = new Color(0.45f, 1f, 0.55f, 0.95f);
         private static readonly Color InvalidColor = new Color(1f, 0.42f, 0.42f, 0.95f);
@@ -57,6 +58,7 @@ namespace BagManagementBattler.Bag
                     SpriteRenderer renderer = cellObject.AddComponent<SpriteRenderer>();
                     renderer.sprite = cellSprite;
                     renderer.color = CellColor;
+                    renderer.sortingLayerName = BagSortingLayer;
                     renderer.sortingOrder = 10;
                     FitSpriteToSize(
                         cellObject.transform,
@@ -215,6 +217,7 @@ namespace BagManagementBattler.Bag
             Sprite backgroundSprite = SelectBackground(width, height);
             background.sprite = backgroundSprite;
             background.color = item.Definition.ItemColor;
+            background.sortingLayerName = BagSortingLayer;
             background.sortingOrder = 20;
             FitSpriteToSize(
                 backgroundObject.transform,
@@ -232,6 +235,7 @@ namespace BagManagementBattler.Bag
                 fillRenderer.sprite = backgroundSprite;
                 fillRenderer.color = ProductionFillColor;
                 fillRenderer.drawMode = SpriteDrawMode.Sliced;
+                fillRenderer.sortingLayerName = BagSortingLayer;
                 fillRenderer.sortingOrder = 21;
                 fillRenderer.enabled = false;
                 productionFills.Add(
@@ -297,6 +301,7 @@ namespace BagManagementBattler.Bag
 
             SpriteRenderer partRenderer = partObject.AddComponent<SpriteRenderer>();
             partRenderer.sprite = sprite;
+            partRenderer.sortingLayerName = BagSortingLayer;
             partRenderer.sortingOrder = sortingOrder;
             return partIndex;
         }

@@ -64,9 +64,10 @@ namespace BagManagementBattler.Tests
         [UnityTest]
         public IEnumerator MeleeUnit_KeepsMovingUntilTouching_WhenOnlyXEdgesMeet()
         {
-            // X edges already touch, but the target is 0.6 higher: the 2D gap is still open.
+            // X edges already touch, but the target is 0.8 higher: the capsules' rounded ends
+            // are still ~0.17 apart, so the 2D gap is open.
             CombatUnit friendly = CreateUnit(CombatTeam.Friendly, new Vector3(-0.2f, 0f, 0f));
-            CombatUnit enemy = CreateUnit(CombatTeam.Enemy, new Vector3(0.2f, 0.6f, 0f));
+            CombatUnit enemy = CreateUnit(CombatTeam.Enemy, new Vector3(0.2f, 0.8f, 0f));
             AcquireTargets(friendly, enemy);
 
             yield return new WaitForFixedUpdate();
@@ -136,6 +137,52 @@ namespace BagManagementBattler.Tests
             Assert.That(friendlies[0].CurrentTarget, Is.SameAs(enemy));
             DestroyUnits(friendlies);
             DestroyUnits(enemy);
+        }
+
+        [Test]
+        public void EdgeGap_UsesTheRealColliderShape_ForTallBodies()
+        {
+            // Bodies are 0.4 x 0.8: stacked 0.85 apart they are 0.05 apart, not 0.45 (half-width circles).
+            CombatUnit lower = CreateUnit(CombatTeam.Friendly, Vector3.zero);
+            CombatUnit upper = CreateUnit(CombatTeam.Enemy, new Vector3(0f, 0.85f, 0f));
+
+            Assert.That(lower.EdgeGapTo(upper), Is.EqualTo(0.05f).Within(0.005f));
+            Assert.That(upper.EdgeGapTo(lower), Is.EqualTo(0.05f).Within(0.005f));
+            DestroyUnits(lower, upper);
+        }
+
+        [UnityTest]
+        public IEnumerator CrowdOfTwentySameTeamUnits_EndsWithNoOverlaps()
+        {
+            const int unitCount = 20;
+            var random = new System.Random(7);
+            var crowd = new CombatUnit[unitCount];
+            for (int index = 0; index < unitCount; index++)
+            {
+                // A tight, overlapping clump inside the GameScene band.
+                var position = new Vector3(
+                    (float)random.NextDouble() * 0.6f,
+                    (float)random.NextDouble() * 0.6f - 0.3f,
+                    0f);
+                crowd[index] = CreateUnit(CombatTeam.Friendly, position, -1.2f, 1.6f);
+            }
+
+            for (int step = 0; step < 400; step++)
+            {
+                yield return new WaitForFixedUpdate();
+            }
+
+            for (int a = 0; a < unitCount; a++)
+            {
+                Assert.That(crowd[a].transform.position.y, Is.InRange(-1.2001f, 1.6001f));
+                for (int b = a + 1; b < unitCount; b++)
+                {
+                    Assert.That(crowd[a].EdgeGapTo(crowd[b]), Is.GreaterThanOrEqualTo(-0.005f),
+                        $"units {a} and {b} overlap");
+                }
+            }
+
+            DestroyUnits(crowd);
         }
 
         [Test]

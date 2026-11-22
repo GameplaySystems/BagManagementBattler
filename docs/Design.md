@@ -121,7 +121,7 @@ Variety comes from head, weapon and stats, not scale. Bosses are scaled-up defau
 | Pistol | 3 | 0.8 s | 3.5 | 4.0 s | 1.0 |
 | Rifle | 4 | 0.6 s | 2.0 | 6.0 s | 0.85 |
 
-Range is edge to edge (see 3.7). Crowbar and Rifle range/production/speed are the tuned config values after the 3A.1 scene check (field units at 0.5 scale, collider 0.21 × 0.4). Damage and cooldown are not in config yet (M1). Knife and Pistol are not authored yet.
+Range is edge to edge (see 3.7). Crowbar and Rifle range/production/speed are the tuned config values after the 3A.1 scene check (field units at 0.5 scale, collider 0.21 × 0.4; since 3A.3 the collider is 0.25 × 0.6). Damage and cooldown are not in config yet (M1). Knife and Pistol are not authored yet.
 
 ### 1.10 Waves and teaching
 
@@ -314,14 +314,15 @@ EditMode for every rule owner and every config `Validate()`; at least one test p
 
 Owned by `CombatUnit` and applied through its kinematic `Rigidbody2D` velocity every fixed step.
 
-- **Range** is a 2D edge-to-edge distance: centre distance minus both units' collider radii (half the collider width). A unit is in range when that distance ≤ its weapon's engagement range. Melee ranges are therefore near zero and mean "touching".
+- **Range** is a 2D edge-to-edge distance between the two units' real colliders (`Physics2D.Distance`; negative while they overlap). A unit is in range when that distance ≤ its weapon's engagement range. Melee ranges are therefore near zero and mean "touching".
 - **With a target:** the unit steers straight toward the target on both axes (normalised direction × movement speed) until in range, then stops.
 - **Without a target:** the unit advances along X only (friendly +X, enemy −X).
 - **Battlefield band:** Y is clamped to the battlefield's min/max Y every step (spawn Y included); no unit ever leaves the band. The band is serialized on each spawner (`battlefieldMinY`/`battlefieldMaxY`, set in `GameScene`) and passed to `CombatUnit.Initialize`.
-- **Same-team separation** stays: a small push between nearby units of the same team, added on top of the move.
+- **Same-team separation:** units of the same team whose collider gap is below `separationGap` push apart on both axes (away from each other's centre). It is recomputed every `separationInterval` (not every step) into a reused query buffer, added on top of the move, and capped at half the unit's move speed so steering toward a target always wins: melee units crowding one target slide around it instead of stalling. The band clamp is applied after it.
 - **No pathfinding** (see 1.14): no obstacle avoidance or routing, just straight steering plus separation.
+- **Depth sorting:** sorting layers back to front: Background, Battlefield, Effects, Bag, UI (Default sits below them and should stay unused). Each `CombatUnit` root has a `SortingGroup` on Battlefield (order 0) and the tent is on Battlefield too, so the 2D renderer's custom transparency sort axis (0, 1, 0) draws lower units in front. Bag sprites are on Bag; the battlefield image is on Background. The spawners draw the band's min/max Y as Scene-view Gizmo lines.
 
-Status: implemented in Task 3A.2; scene check passed 2026-11-22.
+Status: range/chase implemented in 3A.2; collider range, 2D separation, depth sorting and band Gizmos in 3A.3 (scene check pending).
 
 ---
 

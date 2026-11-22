@@ -24,6 +24,11 @@ namespace BagManagementBattler.Combat
             }
         }
 
+        private void OnDrawGizmos()
+        {
+            CombatUnit.DrawBandGizmo(transform.position.x, battlefieldMinY, battlefieldMaxY);
+        }
+
         public CombatUnit Spawn()
         {
             if (SpawnedUnit != null)
