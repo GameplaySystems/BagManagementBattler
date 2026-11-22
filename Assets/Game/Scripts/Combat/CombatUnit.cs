@@ -8,16 +8,19 @@ namespace BagManagementBattler.Combat
     [RequireComponent(typeof(Rigidbody2D), typeof(CapsuleCollider2D))]
     public sealed class CombatUnit : MonoBehaviour
     {
-        [SerializeField] private float visualCellSize = 0.65f;
+        [SerializeField] private Transform visualRoot;
         [SerializeField] private Transform handPoint;
         [SerializeField, Min(0.1f)] private float acquisitionRange = 20f;
         [SerializeField, Min(0.02f)] private float targetRefreshInterval = 0.1f;
+        [SerializeField, Min(0.01f)] private float separationRadius = 0.45f;
+        [SerializeField, Min(0f)] private float separationSpeed = 1.5f;
 
         private readonly List<SpriteRenderer> unitVisualRenderers =
             new List<SpriteRenderer>();
         private readonly Collider2D[] targetCandidates = new Collider2D[32];
         private SpriteRenderer weaponRenderer;
         private Rigidbody2D body;
+        private CapsuleCollider2D bodyCollider;
         private CombatUnit currentTarget;
         private float nextTargetRefreshTime;
 
@@ -27,14 +30,17 @@ namespace BagManagementBattler.Combat
         public float MovementSpeed { get; private set; }
         public float EngagementRange { get; private set; }
         public Rigidbody2D Body => body;
+        public Transform VisualRoot => visualRoot;
         public Transform HandPoint => handPoint;
+        public float HalfWidth =>
+            bodyCollider.size.x * 0.5f * Mathf.Abs(transform.lossyScale.x);
         public CombatUnit CurrentTarget => currentTarget;
         public bool IsInitialized { get; private set; }
 
         private void Awake()
         {
             EnsureBody();
-            EnsureHandPoint();
+            EnsureVisualHierarchy();
         }
 
         private void FixedUpdate()
@@ -45,7 +51,9 @@ namespace BagManagementBattler.Combat
             }
 
             RefreshTargetIfNeeded();
-            body.linearVelocity = new Vector2(ResolveHorizontalVelocity(), 0f);
+            body.linearVelocity = new Vector2(
+                ResolveHorizontalVelocity(),
+                ResolveSeparationVelocity());
         }
 
         private void OnDisable()
@@ -66,7 +74,7 @@ namespace BagManagementBattler.Combat
             }
 
             EnsureBody();
-            EnsureHandPoint();
+            EnsureVisualHierarchy();
             UnitDefinition = loadout.UnitDefinition;
             WeaponDefinition = loadout.WeaponDefinition;
             MovementSpeed = loadout.MovementSpeed;
@@ -76,6 +84,7 @@ namespace BagManagementBattler.Combat
             body.linearVelocity = Vector2.zero;
             currentTarget = null;
             nextTargetRefreshTime = 0f;
+            SetVisualFacing(UnitDefinition.Team == CombatTeam.Enemy ? -1f : 1f);
             ConfigureUnitVisuals();
             ConfigureWeaponVisual();
             IsInitialized = true;
@@ -96,7 +105,7 @@ namespace BagManagementBattler.Combat
         internal void ResetForPool(Vector3 pooledPosition)
         {
             EnsureBody();
-            EnsureHandPoint();
+            EnsureVisualHierarchy();
             IsInitialized = false;
             body.linearVelocity = Vector2.zero;
             transform.SetPositionAndRotation(pooledPosition, Quaternion.identity);
@@ -105,6 +114,7 @@ namespace BagManagementBattler.Combat
             WeaponDefinition = null;
             MovementSpeed = 0f;
             EngagementRange = 0f;
+            SetVisualFacing(1f);
             ClearVisuals();
         }
 
@@ -170,7 +180,8 @@ namespace BagManagementBattler.Combat
             if (IsValidTarget(currentTarget))
             {
                 float horizontalDelta = currentTarget.transform.position.x - transform.position.x;
-                if (Mathf.Abs(horizontalDelta) <= EngagementRange)
+                float edgeGap = Mathf.Abs(horizontalDelta) - HalfWidth - currentTarget.HalfWidth;
+                if (edgeGap <= EngagementRange)
                 {
                     return 0f;
                 }
@@ -181,6 +192,51 @@ namespace BagManagementBattler.Combat
             return Team == CombatTeam.Friendly ? MovementSpeed : -MovementSpeed;
         }
 
+        private float ResolveSeparationVelocity()
+        {
+            int candidateCount = Physics2D.OverlapCircle(
+                transform.position,
+                separationRadius,
+                ContactFilter2D.noFilter,
+                targetCandidates);
+            float push = 0f;
+
+            for (int index = 0; index < candidateCount; index++)
+            {
+                Collider2D candidateCollider = targetCandidates[index];
+                CombatUnit other = candidateCollider != null
+                    ? candidateCollider.GetComponent<CombatUnit>()
+                    : null;
+                if (other == null || other == this || !other.IsInitialized || other.Team != Team)
+                {
+                    continue;
+                }
+
+                Vector2 offset = (Vector2)transform.position - (Vector2)other.transform.position;
+                float distance = offset.magnitude;
+                if (distance >= separationRadius)
+                {
+                    continue;
+                }
+
+                // Units on the same lane get a stable up/down split instead of cancelling out.
+                float direction = Mathf.Abs(offset.y) > 0.0001f
+                    ? Mathf.Sign(offset.y)
+                    : (GetInstanceID() > other.GetInstanceID() ? 1f : -1f);
+                push += direction * (1f - distance / separationRadius);
+            }
+
+            // shortcut: vertical-only push, no crowd solver; revisit if large waves pile up.
+            return push * separationSpeed;
+        }
+
+        private void SetVisualFacing(float sign)
+        {
+            Vector3 scale = visualRoot.localScale;
+            scale.x = Mathf.Abs(scale.x) * sign;
+            visualRoot.localScale = scale;
+        }
+
         private void EnsureBody()
         {
             if (body != null)
@@ -189,24 +245,33 @@ namespace BagManagementBattler.Combat
             }
 
             body = GetComponent<Rigidbody2D>();
+            bodyCollider = GetComponent<CapsuleCollider2D>();
             body.bodyType = RigidbodyType2D.Kinematic;
             body.gravityScale = 0f;
             body.freezeRotation = true;
             body.linearVelocity = Vector2.zero;
         }
 
-        private void EnsureHandPoint()
+        private void EnsureVisualHierarchy()
         {
-            if (handPoint != null)
+            if (visualRoot == null)
             {
-                return;
+                visualRoot = transform.Find("Visual");
+                if (visualRoot == null)
+                {
+                    visualRoot = new GameObject("Visual").transform;
+                    visualRoot.SetParent(transform, false);
+                }
             }
 
-            handPoint = transform.Find("HandPoint");
             if (handPoint == null)
             {
-                handPoint = new GameObject("HandPoint").transform;
-                handPoint.SetParent(transform, false);
+                handPoint = visualRoot.Find("HandPoint");
+                if (handPoint == null)
+                {
+                    handPoint = new GameObject("HandPoint").transform;
+                    handPoint.SetParent(visualRoot, false);
+                }
             }
         }
 
@@ -245,12 +310,12 @@ namespace BagManagementBattler.Combat
             SpriteRenderer renderer = GetOrCreateUnitRenderer(rendererIndex++);
             renderer.sprite = sprite;
             renderer.transform.localPosition = new Vector3(
-                positionInCells.x * visualCellSize,
-                positionInCells.y * visualCellSize,
+                positionInCells.x * UnitVisualLayout.FieldLayoutCellSize,
+                positionInCells.y * UnitVisualLayout.FieldLayoutCellSize,
                 0f);
             renderer.transform.localRotation = Quaternion.identity;
             renderer.transform.localScale =
-                Vector3.one * UnitVisualLayout.ScaleInCells * visualCellSize;
+                Vector3.one * UnitVisualLayout.ScaleInCells * UnitVisualLayout.FieldLayoutCellSize;
             renderer.sortingOrder = sortingOrder;
             renderer.enabled = true;
             return rendererIndex;
@@ -320,7 +385,7 @@ namespace BagManagementBattler.Combat
             }
 
             GameObject visualObject = new GameObject($"Unit Visual {index}");
-            visualObject.transform.SetParent(transform, false);
+            visualObject.transform.SetParent(visualRoot, false);
             SpriteRenderer renderer = visualObject.AddComponent<SpriteRenderer>();
             unitVisualRenderers.Add(renderer);
             return renderer;

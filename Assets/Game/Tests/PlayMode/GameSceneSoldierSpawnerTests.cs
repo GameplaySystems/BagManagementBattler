@@ -49,38 +49,60 @@ namespace BagManagementBattler.Tests
                 .GetComponent<SpriteRenderer>().sortingOrder, Is.EqualTo(22));
             Assert.That(rifleFill.enabled, Is.True);
 
-            yield return new WaitForSeconds(1.05f);
-            Assert.That(spawner.ActiveCount, Is.EqualTo(2));
-            Assert.That(spawner.AvailableCount, Is.EqualTo(2));
+            Transform bagSoldier = FindItemObject("soldier.blue");
+            Assert.That(bagSoldier.Find("Visual 0")
+                .GetComponent<SpriteRenderer>().sortingOrder, Is.EqualTo(22));
+            Assert.That(bagSoldier.Find("Visual 1")
+                .GetComponent<SpriteRenderer>().sortingOrder, Is.EqualTo(23));
 
-            List<CombatUnit> producedUnits =
-                new List<CombatUnit>(spawner.ActiveUnits);
-            CombatUnit rifleUnit = null;
-            CombatUnit crowbarUnit = null;
-            foreach (CombatUnit unit in producedUnits)
+            CombatUnit enemyUnit = enemySpawner.SpawnedUnit;
+            Assert.That(enemyUnit.VisualRoot.localScale.x, Is.LessThan(0f));
+            Assert.That(Mathf.Abs(enemyUnit.VisualRoot.localScale.x), Is.LessThan(1f));
+            Assert.That(enemyUnit.transform.localScale.x, Is.GreaterThan(0f));
+
+            // Waits follow the authored durations, so tuning them does not break this test.
+            // The crowbar is the faster weapon: its first cycle makes exactly one unit.
+            float deadline = Time.time + 15f;
+            while (spawner.ActiveCount == 0 && Time.time < deadline)
             {
-                AssertConfiguredWeaponVisual(unit);
-                if (unit.WeaponDefinition.ItemTypeId == "weapon.rifle.basic")
-                {
-                    rifleUnit = unit;
-                }
-                else if (unit.WeaponDefinition.ItemTypeId == "weapon.crowbar.basic")
-                {
-                    crowbarUnit = unit;
-                }
+                yield return null;
+            }
+
+            Assert.That(spawner.ActiveCount, Is.EqualTo(1));
+            CombatUnit crowbarUnit = FindActiveUnit(spawner, "weapon.crowbar.basic");
+            Assert.That(crowbarUnit, Is.Not.Null);
+
+            CombatUnit rifleUnit = null;
+            while (rifleUnit == null && Time.time < deadline)
+            {
+                yield return null;
+                rifleUnit = FindActiveUnit(spawner, "weapon.rifle.basic");
             }
 
             Assert.That(rifleUnit, Is.Not.Null);
-            Assert.That(crowbarUnit, Is.Not.Null);
-            float startingX = rifleUnit.transform.position.x;
+            List<CombatUnit> producedUnits =
+                new List<CombatUnit>(spawner.ActiveUnits);
+            foreach (CombatUnit unit in producedUnits)
+            {
+                AssertConfiguredWeaponVisual(unit);
+                Assert.That(unit.VisualRoot.localScale.x, Is.GreaterThan(0f));
+            }
+
             yield return new WaitForFixedUpdate();
             yield return new WaitForFixedUpdate();
 
-            Assert.That(rifleUnit.CurrentTarget, Is.SameAs(enemySpawner.SpawnedUnit));
-            Assert.That(enemySpawner.SpawnedUnit.CurrentTarget, Is.Not.Null);
-            Assert.That(rifleUnit.transform.position.x, Is.GreaterThan(startingX));
-            Assert.That(rifleUnit.Body.linearVelocity.x, Is.EqualTo(1f).Within(0.001f));
-            Assert.That(rifleUnit.transform.position.y, Is.EqualTo(tent.transform.position.y).Within(0.001f));
+            // The first crowbar has had time to close in and stop at its edge-to-edge range.
+            Assert.That(rifleUnit.CurrentTarget, Is.SameAs(enemyUnit));
+            Assert.That(enemyUnit.CurrentTarget, Is.Not.Null);
+            Assert.That(crowbarUnit.CurrentTarget, Is.SameAs(enemyUnit));
+            Assert.That(crowbarUnit.Body.linearVelocity.x, Is.EqualTo(0f));
+            float crowbarEdgeGap =
+                Mathf.Abs(enemyUnit.transform.position.x - crowbarUnit.transform.position.x) -
+                crowbarUnit.HalfWidth - enemyUnit.HalfWidth;
+            Assert.That(
+                crowbarEdgeGap,
+                Is.InRange(crowbarUnit.EngagementRange - 0.05f, crowbarUnit.EngagementRange + 0.001f));
+            int pooledCount = spawner.ActiveCount + spawner.AvailableCount;
 
             UnitDefinition unitDefinition = rifleUnit.UnitDefinition;
             BagItemDefinition soldierDefinition = FindSoldierDefinition();
@@ -90,6 +112,7 @@ namespace BagManagementBattler.Tests
             yield return null;
             Assert.That(rifleFill.enabled, Is.False);
 
+            producedUnits = new List<CombatUnit>(spawner.ActiveUnits);
             foreach (CombatUnit unit in producedUnits)
             {
                 Assert.That(spawner.Release(unit), Is.True);
@@ -102,7 +125,7 @@ namespace BagManagementBattler.Tests
             }
 
             Assert.That(spawner.ActiveCount, Is.Zero);
-            Assert.That(spawner.AvailableCount, Is.EqualTo(4));
+            Assert.That(spawner.AvailableCount, Is.EqualTo(pooledCount));
 
             CombatUnit[] reusedUnits = new CombatUnit[4];
             for (int index = 0; index < reusedUnits.Length; index++)
@@ -118,20 +141,39 @@ namespace BagManagementBattler.Tests
             }
         }
 
+        private static CombatUnit FindActiveUnit(SoldierSpawner spawner, string weaponTypeId)
+        {
+            foreach (CombatUnit unit in spawner.ActiveUnits)
+            {
+                if (unit.WeaponDefinition.ItemTypeId == weaponTypeId)
+                {
+                    return unit;
+                }
+            }
+
+            return null;
+        }
+
         private static SpriteRenderer FindRifleFill()
+        {
+            return FindItemObject("weapon.rifle.basic").Find("Production Fill")
+                .GetComponent<SpriteRenderer>();
+        }
+
+        private static Transform FindItemObject(string itemTypeId)
         {
             GameObject items = GameObject.Find("Items");
             Assert.That(items, Is.Not.Null);
             for (int index = 0; index < items.transform.childCount; index++)
             {
                 Transform candidate = items.transform.GetChild(index);
-                if (candidate.name.StartsWith("weapon.rifle.basic"))
+                if (candidate.name.StartsWith(itemTypeId))
                 {
-                    return candidate.Find("Production Fill")
-                        .GetComponent<SpriteRenderer>();
+                    return candidate;
                 }
             }
 
+            Assert.Fail($"No bag item object for '{itemTypeId}'.");
             return null;
         }
 

@@ -16,10 +16,10 @@ MonoBehaviour:
   level: 1
   nextLevelDefinition: {fileID: 0}
   role: 1
-  productionDurationSeconds: 1
+  productionDurationSeconds: 6
   unitDefinition: {fileID: 0}
-  movementSpeedMultiplier: 1
-  engagementRange: 1.2
+  movementSpeedMultiplier: 0.85
+  engagementRange: 1
   footprint:
   - {x: 0, y: 0}
   - {x: 1, y: 0}

@@ -10,11 +10,13 @@ namespace BagManagementBattler.Combat
         [SerializeField] private CombatUnit unitPrefab;
         [SerializeField] private Transform spawnAnchor;
         [SerializeField, Min(0)] private int prewarmCount = 4;
+        [SerializeField, Min(0f)] private float spawnLaneSpacing = 0.15f;
 
         private readonly Queue<CombatUnit> availableUnits = new Queue<CombatUnit>();
         private readonly HashSet<CombatUnit> activeUnits = new HashSet<CombatUnit>();
         private readonly HashSet<CombatUnit> ownedUnits = new HashSet<CombatUnit>();
         private bool initialized;
+        private int spawnCount;
 
         public int ActiveCount => activeUnits.Count;
         public int AvailableCount => availableUnits.Count;
@@ -83,7 +85,10 @@ namespace BagManagementBattler.Combat
             CombatUnit unit = availableUnits.Count > 0
                 ? availableUnits.Dequeue()
                 : CreateUnit();
-            unit.Initialize(request.ToLoadout(), spawnAnchor.position);
+            // Lanes cycle 0, +1, -1 so units spawned together never start stacked.
+            int lane = spawnCount++ % 3;
+            float laneOffset = lane == 0 ? 0f : (lane == 1 ? spawnLaneSpacing : -spawnLaneSpacing);
+            unit.Initialize(request.ToLoadout(), spawnAnchor.position + Vector3.up * laneOffset);
             activeUnits.Add(unit);
             unit.gameObject.SetActive(true);
             return unit;

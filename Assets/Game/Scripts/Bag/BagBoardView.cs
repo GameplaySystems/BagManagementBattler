@@ -249,13 +249,15 @@ namespace BagManagementBattler.Bag
                     unit.BodySprite,
                     UnitVisualLayout.BodyPositionInCells,
                     UnitVisualLayout.ScaleInCells,
-                    partIndex);
+                    partIndex,
+                    22);
                 partIndex = CreateItemVisualPart(
                     itemObject.transform,
                     unit.HeadSprite,
                     UnitVisualLayout.HeadPositionInCells,
                     UnitVisualLayout.ScaleInCells,
-                    partIndex);
+                    partIndex,
+                    23);
             }
             else
             {
@@ -266,7 +268,8 @@ namespace BagManagementBattler.Bag
                         part.Sprite,
                         part.LocalPositionInCells,
                         part.ScaleInCells,
-                        partIndex);
+                        partIndex,
+                        22);
                 }
             }
         }
@@ -276,7 +279,8 @@ namespace BagManagementBattler.Bag
             Sprite sprite,
             Vector2 positionInCells,
             float scaleInCells,
-            int partIndex)
+            int partIndex,
+            int sortingOrder)
         {
             if (sprite == null)
             {
@@ -293,7 +297,7 @@ namespace BagManagementBattler.Bag
 
             SpriteRenderer partRenderer = partObject.AddComponent<SpriteRenderer>();
             partRenderer.sprite = sprite;
-            partRenderer.sortingOrder = 22;
+            partRenderer.sortingOrder = sortingOrder;
             return partIndex;
         }
 

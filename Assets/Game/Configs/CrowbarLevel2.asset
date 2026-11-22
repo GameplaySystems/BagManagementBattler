@@ -16,10 +16,10 @@ MonoBehaviour:
   level: 2
   nextLevelDefinition: {fileID: 0}
   role: 1
-  productionDurationSeconds: 1
+  productionDurationSeconds: 3.4
   unitDefinition: {fileID: 0}
   movementSpeedMultiplier: 1
-  engagementRange: 0.6
+  engagementRange: 0.7
   footprint:
   - {x: 0, y: 0}
   iconSprite: {fileID: 9150454052939042591, guid: f9410564c377b664b9a73fe705f54ca3, type: 3}
