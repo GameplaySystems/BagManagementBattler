@@ -24,12 +24,21 @@
 ## Now
 
 - **Milestone:** M0 Reset (ends Nov 24)
-- **Current task:** 3A.3 (Queue #1 below)
-- **Status:** committed and pushed at the user's request; user scene check not yet confirmed. Next: 3A.4 (Queue #2).
+- **Current task:** M1-1 (Queue #1 below).
+- **Status:** not started
 - **Owner:** Claude
 - **Last updated:** 2026-11-22 by Claude
 
 ## Handoff notes
+
+- 2026-11-22 Claude: user confirmed the 3A.3 scene check; 3A.3 moved to the Done log. Known trade-off accepted: the waiting rule chains through ranks, so later units wait behind the crowd; queued 3A.5 (attack slots and retarget) after M1-2, and M1-2 now makes "Waiting" a proper unit state. `CLAUDE.md` removed from `.git/info/exclude` and committed with 3A.4 (amended, then pushed).
+
+- 2026-11-22 Claude: user confirmed the 3A.4 scene check (jitter and opponent overlap fixed; the waiting trade-off — a thinner ring in large mixed fights — is accepted). 3A.4 moved to the Done log and committed; not pushed. Next: M1-1.
+
+- 2026-11-22 Claude, 3A.4 finished in code (not committed): the diagnostic log showed the outer units, which can't reach the target, sliding back and forth forever (≈0.1 u/s) and bumping the engaged ring. Fix in `CombatUnit`: a **waiting** state. A unit touching a resting (engaged or waiting) teammate that is closer to its own target, with a slide under 0.5 × speed, stops steering and stays stopped while that contact lasts (`IsResting`, `IsCloserToTarget`, `WaitSlideShareOfSpeed`). Resting units use the overlap-only teammate threshold. Waiting is reset wherever `engaged` is. New test `OneVersusEightMeleeCrowd_WaitingUnitsAdvanceOnceTheFrontRowLeaves`. The jitter test failed before the fix (4 flips) and passes after it with 0 flips. All `JITTERDBG` logs removed. Run 2026-11-22: **EditMode 37/37, PlayMode 16/16**; `git diff --check` clean. Design §3.7 updated. `CLAUDE.md` gained the `-testFilter` command; that file is in `.git/info/exclude`, so git does not track it. Not done: the user's `GameScene` check, commit.
+
+- 2026-11-22 Claude (resumed 3A.4 after an interrupted session; nothing committed): uncommitted work in `CombatUnit.cs` + `CombatUnitMovementTests.cs`. Done in code: (1) hysteresis — `engaged` flag, engage at gap ≤ range, release at gap > range + `engagementMargin` 0.05, reset on target change/clear/Initialize/ResetForPool, exposed as `IsEngaged`; (2) opponents in the separation query (circle = body extent + `separationRadius`), push away only on true overlap past `separationDeadZone` 0.02 with a steep ramp, capped at full move speed; plus a per-step guard `WithoutPushIntoOpponents` that limits approach along `ColliderDistance2D.normal` (oriented toward the opponent) to half the remaining gap; (3) velocity smoothing — `MoveTowards` at `MovementSpeed × velocityResponse` (10)/s; (4) dead zone on all separation thresholds; (5) engaged units push teammates only on true overlap (threshold 0, not `separationGap`); moving units drop the step component into touching teammates (`crowdBlockDirection`). Tests added: `OneVersusEightMeleeCrowd_SettlesWithoutJitter` (≤3 direction flips per unit over 3 s after 3 s settle), `OneVersusEightMeleeCrowd_OpponentsNeverOverlapBeyondTheDeadZone`, a TearDown that destroys leftover units; the advance test waits 10 steps for the ramp. A `JITTERDBG` Debug.Log is still in the jitter test (to remove). Last batch run hung (Unity at 0.3 MB / 0% CPU, likely licensing); no test result for this code yet.
+- 2026-11-22 Claude, later: removed the old JITTERDBG log; Design §3.7 now describes the 3A.4 rules; CLAUDE.md "Running tests" has the `-testFilter` command and the stray-Unity/3-minute-stall rule. Filtered run (`CombatUnitMovementTests`, PlayMode) worked, licensing was fine: **8/9 passed**, `OneVersusEightMeleeCrowd_SettlesWithoutJitter` failed (unit #2: 4 direction flips, limit 3). All other new tests passed, including opponent non-overlap. Added a **temporary** JITTERDBG log at the flip counter to find the cause; it has not run yet because the user then opened the project in the Editor (batch mode is blocked). Next: run the jitter test alone, read the JITTERDBG lines, fix the root cause, remove the log, then run the full EditMode + PlayMode suites. Full suites not run.
 
 - 2026-11-22 Claude: 3A.3 implemented and committed + pushed at the user's request (commit "Task 3A.3: …"); scene check not yet confirmed, so it stays out of the Done log. Queued 3A.4 (crowd stability) as next; hysteresis removed from M1-2. `CombatUnit`: `EdgeGapTo` = `Physics2D.Distance` (HalfWidth removed); separation is 2D, gap-based (`separationGap` 0.05), recomputed every `separationInterval` 0.1 s, capped at 0.5 × move speed; `Initialize`/`ResetForPool` also set `body.position` and clear the separation cache. Band Gizmos via `CombatUnit.DrawBandGizmo` from both spawners. Sorting layers Background/Battlefield/Effects/Bag/UI in TagManager (Default stays first); Renderer2D sort mode CustomAxis (0,1,0); `SortingGroup` (Battlefield) on the prefab root; tent → Battlefield, battlefield image → Background; `BagBoardView` renderers → Bag. Tests: new `DepthSortingTests` (EditMode, real assets), crowd-of-20 and tall-collider gap tests (PlayMode); melee-touch test moved its target to y 0.8 (capsule ends); GameScene test now checks layers and "not steering" instead of `velocity.x == 0`, since later crowbars push the first one. Run 2026-11-22: EditMode 37/37, PlayMode 13/13 (the only later edit: stripped the trailing space Unity wrote on the prefab's empty `m_Name`); `git diff --check` clean; `GameScene` is the only build scene.
 - 2026-11-22 Claude: queued 3A.3 (2D separation, band Gizmos, depth sorting) ahead of M1-1; M1-2 gained knockback/area-hit fields and attack-range hysteresis. Docs only, not committed.
@@ -41,37 +50,18 @@
 ## Found, not fixed
 
 - `CrowbarLevel2` is still 3.4 s / range 0.7, but L1 is now 2 s / 0.15. L2 is slower and longer-ranged than L1, which breaks the 1.9 level rule (×0.85 → 1.7 s). Re-derive it when L2 matters (M3 content).
-- Separation can nudge a stopped unit just out of range (seen in the scene test: gap 0.152 vs range 0.15), so it steps back in on the next fixed step. Fix queued as 3A.4 (attack-range hysteresis).
+- Separation can nudge a stopped unit just out of range (seen in the scene test: gap 0.152 vs range 0.15), so it steps back in on the next fixed step. Addressed by 3A.4 hysteresis (margin 0.05); recheck it in the 3A.4 scene check.
 - The soldier art exists twice: the separate `Assets/Game/Art/Soldier_Sprites/PNG/` files and `soldier_atlas_512.png`. The configs only use `PNG/`; decide whether to delete the atlas or switch to it (e.g. before the M3 content pass).
 
 ## Queue
 
-1. **3A.3 — crowd separation, band Gizmos, depth sorting** (rule: `docs/Design.md` §3.7)
-   - **Scope:**
-     - 2D same-team separation: push apart on both axes (not only Y), throttled (not every fixed step), neighbour query into a reused buffer (no per-step allocation), weaker than target steering so melee units spread around a target instead of stalling. The band clamp still wins.
-     - Battlefield band: Gizmo lines at min/max Y in the Scene view.
-     - Depth sorting: sorting layers Background / Battlefield / Effects / Bag / UI; a `SortingGroup` on the `CombatUnit` root; custom transparency sort axis (0, 1, 0) on the URP 2D renderer asset; the tent on the Battlefield layer.
-   - **In scope:** project settings (sorting layers, Graphics) and the 2D renderer asset; the unit prefab and `GameScene` for the Sorting Group and layer assignments.
-   - **Added by the user (2026-11-22):** `CombatUnit` collider 0.25 × 0.6 (offset 0, 0) and the `head_cap_*` sprite pivots (0.43, 0.5); range and separation use real collider distance (`Physics2D.Distance`) instead of the half-width circle.
-   - **Out of scope:** attacks, damage, states, `UnitSpawner` rename, pathfinding.
-   - **Tests:**
-     - in a crowd of 20 same-team units, no two overlap after N steps;
-     - a unit lower on screen renders in front of one higher up.
-   - **Acceptance:** those tests; EditMode + PlayMode pass; `git diff --check` clean; prefab/scene references resolve and `GameScene` stays the only build scene; manual `GameScene` check (melee units fan out around a target, lower units draw in front, band lines visible in the Scene view).
-2. **3A.4 — crowd stability** (rule: `docs/Design.md` §3.7; update it with the new rules)
-   - **Scope:**
-     - Opposing units never overlap: include opponents in the separation query, but push away from an opponent only while the collider gap is negative (beyond the dead zone). Same-team rules stay as in 3A.3.
-     - Attack-range hysteresis now, not in M1-2: a unit becomes engaged at gap ≤ range and disengages only at gap > range + margin. Engaged units stop steering (separation still applies).
-     - Velocity smoothing: the body velocity moves toward the desired velocity (move + separation) instead of jumping to it each step. The band clamp still wins.
-     - A small overlap dead zone for separation, so units that barely touch do not jitter.
-   - **Out of scope:** attacks, damage, states, `UnitSpawner` rename, pathfinding.
-   - **Tests:**
-     - in a 1-vs-8 melee crowd, once settled, no unit's position changes direction more than a small number of times over 3 seconds;
-     - opposing units never overlap beyond the dead zone.
-   - **Acceptance:** those tests; EditMode + PlayMode pass; `git diff --check` clean; manual `GameScene` check (crowd settles without jitter, no unit passes through an opponent).
-3. M1-1 — rename `SoldierSpawner` → `UnitSpawner` (one instance per team); enemy spawning through it; delete nothing else yet.
-4. M1-2 — `Health` + unit state machine (Idle, Walk, MeleeAttack, RangedAttack, Death); direct damage; white hit flash; weapon knockback and area-hit fields (with `Validate()` ranges and tests). (Attack-range hysteresis moved to 3A.4.)
-5. M1-3 — death → release at most once; `PlayerBase` + contact damage; WebGL portrait smoke build.
+1. M1-1 — rename `SoldierSpawner` → `UnitSpawner` (one instance per team); enemy spawning through it; delete nothing else yet.
+2. M1-2 — `Health` + unit state machine (Idle, Walk, MeleeAttack, RangedAttack, Death); direct damage; white hit flash; weapon knockback and area-hit fields (with `Validate()` ranges and tests). "Waiting" (3A.4) becomes a proper unit state, not a flag. (Attack-range hysteresis moved to 3A.4.)
+3. **3A.5 — attack slots and retarget** (rule: `docs/Design.md` §3.7)
+   - **Scope:** 6–8 melee slots on a ring around each target; a melee unit claims the nearest free slot and steers to that point; no free slot → retarget to the nearest enemy that has one; wait only if no enemy has a free slot. Ranged units never take slots. Slots are released on death, retarget and pool release (release-once).
+   - **Why:** the 3A.4 waiting rule chains through ranks, so later units wait behind the crowd instead of moving to another target (accepted trade-off for now).
+   - **Acceptance:** evaluate after M1-2 with real kills; close 3A.5 without building it if crowds already resolve.
+4. M1-3 — death → release at most once; `PlayerBase` + contact damage; WebGL portrait smoke build.
 
 ## Done log
 
@@ -82,3 +72,5 @@
 | 3A | shared `CombatUnit`, `UnitCatalog`, targeting and chase | `15c7028`, `2886553` |
 | 3A.1 | field-scale `Visual` root, enemy mirroring, edge-to-edge X range, spawn lanes + separation, tuned rifle/crowbar configs, bag head sorting | commit "Task 3A.1: combat visual and movement fixes" |
 | 3A.2 | 2D edge-to-edge range (`EdgeGapTo`), diagonal chase, battlefield Y band on both spawners (−1.2…1.6 in `GameScene`), enemy spawn moved to y 1.112 | `237cb29` |
+| 3A.3 | collider-distance range, 2D throttled same-team separation, band Gizmos, sorting layers + `SortingGroup` + custom sort axis | `95e86fc` |
+| 3A.4 | crowd stability: engagement hysteresis, velocity smoothing, separation dead zone, opponent non-overlap (push + per-step guard), waiting behind resting teammates | commit "Task 3A.4: crowd stability" |

@@ -256,7 +256,7 @@ Namespaces: `BagManagementBattler.Bag`, `.Combat`, `.Flow`, `.Economy`, `.UI`, `
 |---|---|---|---|
 | `UnitDefinition`, `UnitCatalog` | SO | per-team/archetype/level body stats and visuals | done (HP: next) |
 | `CombatUnitLoadout` | value | unit def + weapon def → final stats | done |
-| `CombatUnit` | MB | one unit: initialize, own state machine, movement, targeting; mirrors its visual root for the enemy team; movement per 3.7 | movement and targeting done (3A.2); states/attacks: M1-2 |
+| `CombatUnit` | MB | one unit: initialize, own state machine, movement, targeting; mirrors its visual root for the enemy team; movement per 3.7 | movement and targeting done (3A.2–3A.4); states/attacks: M1-2 |
 | `UnitVisualLayout` | static | visual sizing helper | done |
 | `BagProductionController` | MB | session lifecycle, ticking, forwards requests | done |
 | `SoldierSpawner` → **`UnitSpawner`** | MB | pool, acquire/init/release, track active, recycle all; one instance per team | rename + generalize: next |
@@ -316,13 +316,17 @@ Owned by `CombatUnit` and applied through its kinematic `Rigidbody2D` velocity e
 
 - **Range** is a 2D edge-to-edge distance between the two units' real colliders (`Physics2D.Distance`; negative while they overlap). A unit is in range when that distance ≤ its weapon's engagement range. Melee ranges are therefore near zero and mean "touching".
 - **With a target:** the unit steers straight toward the target on both axes (normalised direction × movement speed) until in range, then stops.
+- **Engagement hysteresis:** a unit becomes *engaged* at gap ≤ range and lets go only at gap > range + `engagementMargin` (0.05). Engaged units do not steer (separation still applies). Changing or losing the target clears it.
+- **Velocity smoothing:** the body velocity moves toward the desired velocity (move + separation) at `MovementSpeed × velocityResponse` (10) per second instead of jumping to it.
 - **Without a target:** the unit advances along X only (friendly +X, enemy −X).
 - **Battlefield band:** Y is clamped to the battlefield's min/max Y every step (spawn Y included); no unit ever leaves the band. The band is serialized on each spawner (`battlefieldMinY`/`battlefieldMaxY`, set in `GameScene`) and passed to `CombatUnit.Initialize`.
-- **Same-team separation:** units of the same team whose collider gap is below `separationGap` push apart on both axes (away from each other's centre). It is recomputed every `separationInterval` (not every step) into a reused query buffer, added on top of the move, and capped at half the unit's move speed so steering toward a target always wins: melee units crowding one target slide around it instead of stalling. The band clamp is applied after it.
+- **Same-team separation:** units of the same team whose collider gap is below `separationGap` push apart on both axes (away from each other's centre). It is recomputed every `separationInterval` (not every step) into a reused query buffer, added on top of the move, and capped at half the unit's move speed so steering toward a target always wins: melee units crowding one target slide around it instead of stalling. The band clamp is applied after it. Engaged units push teammates only on true overlap (gap < 0), so a packed ring around a target can rest; a moving unit drops the part of its step that goes into touching teammates and slides past them instead. **Waiting:** a moving unit touching (gap < `separationGap`) a *resting* teammate (engaged or waiting) that is closer to its target, whose remaining slide is under half its speed, waits (no steering) and keeps waiting while that contact lasts; resting units are treated like engaged ones for separation. The "closer to the target" order means waiting units cannot hold each other in a loop, and they resume once the front unit is gone. Known trade-off: waiting chains through ranks, so later units wait behind the crowd instead of picking another target (3A.5, attack slots, may replace it).
+- **Opponents never overlap:** opponents are in the same query, but push only while the collider gap is below −`separationDeadZone` (steep ramp, capped at full move speed). Every step a guard also limits the velocity component toward each nearby opponent (along `ColliderDistance2D.normal`) to half the remaining gap, so two approaching units can never cross.
+- **Dead zone:** all separation thresholds are lowered by `separationDeadZone` (0.02), so barely-touching units stay still instead of jittering.
 - **No pathfinding** (see 1.14): no obstacle avoidance or routing, just straight steering plus separation.
 - **Depth sorting:** sorting layers back to front: Background, Battlefield, Effects, Bag, UI (Default sits below them and should stay unused). Each `CombatUnit` root has a `SortingGroup` on Battlefield (order 0) and the tent is on Battlefield too, so the 2D renderer's custom transparency sort axis (0, 1, 0) draws lower units in front. Bag sprites are on Bag; the battlefield image is on Background. The spawners draw the band's min/max Y as Scene-view Gizmo lines.
 
-Status: range/chase implemented in 3A.2; collider range, 2D separation, depth sorting and band Gizmos in 3A.3 (scene check pending).
+Status: range/chase implemented in 3A.2; collider range, 2D separation, depth sorting and band Gizmos in 3A.3 (scene check passed); hysteresis, smoothing, dead zone, waiting and opponent non-overlap in 3A.4 (scene check passed).
 
 ---
 

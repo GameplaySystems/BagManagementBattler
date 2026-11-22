@@ -12,24 +12,37 @@ namespace BagManagementBattler.Combat
         [SerializeField] private Transform handPoint;
         [SerializeField, Min(0.1f)] private float acquisitionRange = 20f;
         [SerializeField, Min(0.02f)] private float targetRefreshInterval = 0.1f;
+        // Neighbour look-ahead beyond this unit's own body (query circle = body extent + this).
         [SerializeField, Min(0.01f)] private float separationRadius = 0.45f;
         [SerializeField, Min(0.001f)] private float separationGap = 0.05f;
         [SerializeField, Min(0f)] private float separationSpeed = 1.5f;
         [SerializeField, Min(0.02f)] private float separationInterval = 0.1f;
+        [SerializeField, Min(0f)] private float separationDeadZone = 0.02f;
+        [SerializeField, Min(0f)] private float engagementMargin = 0.05f;
+        [SerializeField, Min(0.1f)] private float velocityResponse = 10f;
 
         // Separation never exceeds this share of the move speed, so steering toward a target wins.
         private const float MaxSeparationShareOfSpeed = 0.5f;
+        // A blocked unit whose sliding step is below this share of its speed waits instead.
+        private const float WaitSlideShareOfSpeed = 0.5f;
 
         private readonly List<SpriteRenderer> unitVisualRenderers =
             new List<SpriteRenderer>();
         private readonly Collider2D[] targetCandidates = new Collider2D[32];
+        private readonly CombatUnit[] nearbyOpponents = new CombatUnit[32];
+        private int nearbyOpponentCount;
         private SpriteRenderer weaponRenderer;
         private Rigidbody2D body;
         private CapsuleCollider2D bodyCollider;
         private CombatUnit currentTarget;
         private float nextTargetRefreshTime;
         private Vector2 separationVelocity;
+        private Vector2 crowdBlockDirection;
         private float nextSeparationTime;
+        private bool engaged;
+        // Blocked behind a resting teammate that is closer to the target; does not steer.
+        private bool waiting;
+        private bool touchingRestingTeammate;
         private float bandMinY = float.NegativeInfinity;
         private float bandMaxY = float.PositiveInfinity;
 
@@ -42,6 +55,10 @@ namespace BagManagementBattler.Combat
         public Transform VisualRoot => visualRoot;
         public Transform HandPoint => handPoint;
         public CombatUnit CurrentTarget => currentTarget;
+        /// <summary>In attack range of the current target (with hysteresis); engaged units do not steer.</summary>
+        public bool IsEngaged => engaged;
+        /// <summary>Engaged, or waiting behind a resting teammate nearer the target; resting units do not steer.</summary>
+        public bool IsResting => engaged || waiting;
         public bool IsInitialized { get; private set; }
 
         private void Awake()
@@ -64,7 +81,13 @@ namespace BagManagementBattler.Combat
                 nextSeparationTime = Time.time + separationInterval;
             }
 
-            Vector2 velocity = ResolveMoveVelocity() + separationVelocity;
+            Vector2 desired = ResolveMoveVelocity() + separationVelocity;
+            // Ease toward the desired velocity (rate scales with move speed) to damp direction flips.
+            Vector2 velocity = Vector2.MoveTowards(
+                body.linearVelocity,
+                desired,
+                MovementSpeed * velocityResponse * Time.fixedDeltaTime);
+            velocity = WithoutPushIntoOpponents(velocity);
             // Limit the vertical step so the next position stays inside the battlefield band.
             float currentY = body.position.y;
             float nextY = Mathf.Clamp(currentY + velocity.y * Time.fixedDeltaTime, bandMinY, bandMaxY);
@@ -80,6 +103,8 @@ namespace BagManagementBattler.Combat
             }
 
             currentTarget = null;
+            engaged = false;
+            waiting = false;
         }
 
         public void Initialize(
@@ -114,7 +139,12 @@ namespace BagManagementBattler.Combat
             body.linearVelocity = Vector2.zero;
             currentTarget = null;
             nextTargetRefreshTime = 0f;
+            engaged = false;
+            waiting = false;
             separationVelocity = Vector2.zero;
+            crowdBlockDirection = Vector2.zero;
+            touchingRestingTeammate = false;
+            ClearNearbyOpponents();
             nextSeparationTime = 0f;
             SetVisualFacing(UnitDefinition.Team == CombatTeam.Enemy ? -1f : 1f);
             ConfigureUnitVisuals();
@@ -130,7 +160,14 @@ namespace BagManagementBattler.Combat
                 return;
             }
 
-            currentTarget = FindNearestTarget();
+            CombatUnit nearest = FindNearestTarget();
+            if (nearest != currentTarget)
+            {
+                engaged = false;
+                waiting = false;
+            }
+
+            currentTarget = nearest;
             nextTargetRefreshTime = Time.time + targetRefreshInterval;
         }
 
@@ -143,7 +180,12 @@ namespace BagManagementBattler.Combat
             transform.SetPositionAndRotation(pooledPosition, Quaternion.identity);
             body.position = pooledPosition;
             currentTarget = null;
+            engaged = false;
+            waiting = false;
             separationVelocity = Vector2.zero;
+            crowdBlockDirection = Vector2.zero;
+            touchingRestingTeammate = false;
+            ClearNearbyOpponents();
             nextSeparationTime = 0f;
             UnitDefinition = null;
             WeaponDefinition = null;
@@ -163,6 +205,8 @@ namespace BagManagementBattler.Combat
             }
 
             currentTarget = null;
+            engaged = false;
+            waiting = false;
             if (Time.time >= nextTargetRefreshTime)
             {
                 RefreshTargetNow();
@@ -239,26 +283,108 @@ namespace BagManagementBattler.Combat
         {
             if (IsValidTarget(currentTarget))
             {
-                if (EdgeGapTo(currentTarget) <= EngagementRange)
+                // Hysteresis: engage at the range, let go only past range + margin.
+                float gap = EdgeGapTo(currentTarget);
+                engaged = engaged
+                    ? gap <= EngagementRange + engagementMargin
+                    : gap <= EngagementRange;
+                if (engaged)
                 {
                     return Vector2.zero;
                 }
 
-                Vector2 delta = currentTarget.transform.position - transform.position;
-                return delta.normalized * MovementSpeed;
+                Vector2 steer = (currentTarget.body.position - body.position).normalized * MovementSpeed;
+                // Do not walk into touching teammates: keep only the part of the step that slides past them.
+                float into = Vector2.Dot(steer, crowdBlockDirection);
+                Vector2 slide = into > 0f ? steer - crowdBlockDirection * into : steer;
+                // Behind a resting teammate with little room to slide: wait, and keep waiting while
+                // that contact lasts, instead of sliding back and forth along the crowd.
+                waiting = touchingRestingTeammate &&
+                          (waiting || slide.magnitude < MovementSpeed * WaitSlideShareOfSpeed);
+                return waiting ? Vector2.zero : slide;
             }
 
             return new Vector2(Team == CombatTeam.Friendly ? MovementSpeed : -MovementSpeed, 0f);
+        }
+
+        // Checked every step against the opponents the throttled query found nearby: nothing
+        // (steering, smoothing lag, teammate pushes) may close more than half the remaining gap
+        // to an opponent per step; the opponent may close the other half, so the two never cross.
+        private Vector2 WithoutPushIntoOpponents(Vector2 velocity)
+        {
+            // Removing the part toward one opponent can add speed toward another, so project
+            // twice and stand still (always safe) if a limit is still broken.
+            for (int pass = 0; pass < 3; pass++)
+            {
+                bool violated = false;
+                for (int index = 0; index < nearbyOpponentCount; index++)
+                {
+                    CombatUnit opponent = nearbyOpponents[index];
+                    if (!IsValidTarget(opponent))
+                    {
+                        continue;
+                    }
+
+                    ColliderDistance2D contact = Physics2D.Distance(bodyCollider, opponent.bodyCollider);
+                    if (!contact.isValid)
+                    {
+                        continue;
+                    }
+
+                    // The gap closes along the contact normal, not the centre line (capsules); orient it toward the opponent.
+                    Vector2 centreLine = opponent.body.position - body.position;
+                    Vector2 toOpponent = Vector2.Dot(contact.normal, centreLine) >= 0f ? contact.normal : -contact.normal;
+                    float into = Vector2.Dot(velocity, toOpponent);
+                    float maxInto = Mathf.Max(contact.distance, 0f) * 0.5f / Time.fixedDeltaTime;
+                    if (into > maxInto + 0.0001f)
+                    {
+                        violated = true;
+                        if (pass < 2)
+                        {
+                            velocity -= toOpponent * (into - maxInto);
+                        }
+                    }
+                }
+
+                if (!violated)
+                {
+                    return velocity;
+                }
+            }
+
+            return Vector2.zero;
+        }
+
+        // Strict ordering by distance to the own target, so waiting units can never hold each other in a loop.
+        private bool IsCloserToTarget(CombatUnit teammate)
+        {
+            if (!IsValidTarget(currentTarget))
+            {
+                return false;
+            }
+
+            Vector2 target = currentTarget.body.position;
+            return (teammate.body.position - target).sqrMagnitude < (body.position - target).sqrMagnitude;
+        }
+
+        private void ClearNearbyOpponents()
+        {
+            Array.Clear(nearbyOpponents, 0, nearbyOpponentCount);
+            nearbyOpponentCount = 0;
         }
 
         private Vector2 ResolveSeparationVelocity()
         {
             int candidateCount = Physics2D.OverlapCircle(
                 body.position,
-                separationRadius,
+                bodyCollider.bounds.extents.magnitude + separationRadius,
                 ContactFilter2D.noFilter,
                 targetCandidates);
-            Vector2 push = Vector2.zero;
+            Vector2 teamPush = Vector2.zero;
+            Vector2 opponentPush = Vector2.zero;
+            Vector2 blockSum = Vector2.zero;
+            touchingRestingTeammate = false;
+            ClearNearbyOpponents();
 
             for (int index = 0; index < candidateCount; index++)
             {
@@ -266,13 +392,27 @@ namespace BagManagementBattler.Combat
                 CombatUnit other = candidateCollider != null
                     ? candidateCollider.GetComponent<CombatUnit>()
                     : null;
-                if (other == null || other == this || !other.IsInitialized || other.Team != Team)
+                if (other == null || other == this || !other.IsInitialized)
                 {
                     continue;
                 }
 
                 float gap = EdgeGapTo(other);
-                if (gap >= separationGap)
+                bool teammate = other.Team == Team;
+                if (!teammate)
+                {
+                    nearbyOpponents[nearbyOpponentCount++] = other;
+                }
+                else if (gap < separationGap && other.IsResting && IsCloserToTarget(other))
+                {
+                    touchingRestingTeammate = true;
+                }
+
+                // Moving units keep a small gap to teammates. Resting units (and every opponent pair)
+                // only push apart once they truly overlap, so a packed ring around a target can rest.
+                // All ignore the dead zone just below their threshold, so barely-touching units stay still.
+                float threshold = (teammate && !IsResting ? separationGap : 0f) - separationDeadZone;
+                if (gap >= threshold)
                 {
                     continue;
                 }
@@ -282,12 +422,26 @@ namespace BagManagementBattler.Combat
                 Vector2 direction = offset.sqrMagnitude > 0.00000001f
                     ? offset.normalized
                     : (GetInstanceID() > other.GetInstanceID() ? Vector2.up : Vector2.down);
-                push += direction * Mathf.Clamp01((separationGap - gap) / separationGap);
+                if (teammate)
+                {
+                    teamPush += direction * Mathf.Clamp01((threshold - gap) / separationGap);
+                    blockSum -= direction;
+                }
+                else
+                {
+                    // Steep ramp so an opponent overlap is undone before it grows past the dead zone.
+                    opponentPush += direction * Mathf.Clamp01(
+                        (threshold - gap) / Mathf.Max(separationDeadZone, 0.001f));
+                }
             }
 
+            crowdBlockDirection = blockSum.normalized;
+
+            // Team push stays weaker than steering; opponent push may reach full move speed.
             return Vector2.ClampMagnitude(
-                push * separationSpeed,
-                MovementSpeed * MaxSeparationShareOfSpeed);
+                       teamPush * separationSpeed,
+                       MovementSpeed * MaxSeparationShareOfSpeed) +
+                   Vector2.ClampMagnitude(opponentPush * separationSpeed, MovementSpeed);
         }
 
         private void SetVisualFacing(float sign)

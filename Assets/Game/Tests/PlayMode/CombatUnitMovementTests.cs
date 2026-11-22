@@ -9,6 +9,16 @@ namespace BagManagementBattler.Tests
 {
     public sealed class CombatUnitMovementTests
     {
+        [TearDown]
+        public void DestroyLeftoverUnits()
+        {
+            // A failed assert skips the test's own cleanup; leftover units would become targets in later tests.
+            foreach (CombatUnit unit in Object.FindObjectsByType<CombatUnit>(FindObjectsSortMode.None))
+            {
+                Object.DestroyImmediate(unit.gameObject);
+            }
+        }
+
         [UnityTest]
         public IEnumerator SpawnedKinematicSoldier_AdvancesTowardPositiveX()
         {
@@ -42,8 +52,11 @@ namespace BagManagementBattler.Tests
                 new ProductionRequest(soldierDefinition, weaponDefinition));
             float startingX = unit.transform.position.x;
 
-            yield return new WaitForFixedUpdate();
-            yield return new WaitForFixedUpdate();
+            // Velocity eases in (2 speed x 10/s response x 0.02 s = 0.4 per step), so wait past the ramp.
+            for (int step = 0; step < 10; step++)
+            {
+                yield return new WaitForFixedUpdate();
+            }
 
             Assert.That(unit.Body.bodyType, Is.EqualTo(RigidbodyType2D.Kinematic));
             Assert.That(unit.Body.linearVelocity.x, Is.EqualTo(2f).Within(0.001f));
@@ -183,6 +196,135 @@ namespace BagManagementBattler.Tests
             }
 
             DestroyUnits(crowd);
+        }
+
+        // Mirrors CombatUnit.separationDeadZone's default.
+        private const float SeparationDeadZone = 0.02f;
+        private const int SettleSteps = 150;
+        private const int MeasureSteps = 150; // 3 s at the default 0.02 s fixed step
+
+        [UnityTest]
+        public IEnumerator OneVersusEightMeleeCrowd_SettlesWithoutJitter()
+        {
+            CombatUnit[] units = CreateOneVersusEightCrowd();
+            for (int step = 0; step < SettleSteps; step++)
+            {
+                yield return new WaitForFixedUpdate();
+            }
+
+            var previous = new Vector2[units.Length];
+            var lastStep = new Vector2[units.Length];
+            var flips = new int[units.Length];
+            for (int index = 0; index < units.Length; index++)
+            {
+                previous[index] = units[index].Body.position;
+            }
+
+            for (int step = 0; step < MeasureSteps; step++)
+            {
+                yield return new WaitForFixedUpdate();
+                for (int index = 0; index < units.Length; index++)
+                {
+                    Vector2 position = units[index].Body.position;
+                    Vector2 delta = position - previous[index];
+                    previous[index] = position;
+                    if (delta.sqrMagnitude < 0.0001f * 0.0001f)
+                    {
+                        continue;
+                    }
+
+                    if (Vector2.Dot(delta, lastStep[index]) < 0f)
+                    {
+                        flips[index]++;
+                    }
+
+                    lastStep[index] = delta;
+                }
+            }
+
+            for (int index = 0; index < units.Length; index++)
+            {
+                Assert.That(flips[index], Is.LessThanOrEqualTo(3), $"{units[index].name} #{index} jitters");
+            }
+
+            DestroyUnits(units);
+        }
+
+        [UnityTest]
+        public IEnumerator OneVersusEightMeleeCrowd_OpponentsNeverOverlapBeyondTheDeadZone()
+        {
+            CombatUnit[] units = CreateOneVersusEightCrowd();
+            CombatUnit enemy = units[0];
+            float minimumGap = float.PositiveInfinity;
+            string worst = string.Empty;
+            for (int step = 0; step < SettleSteps + MeasureSteps; step++)
+            {
+                yield return new WaitForFixedUpdate();
+                for (int index = 1; index < units.Length; index++)
+                {
+                    float gap = units[index].EdgeGapTo(enemy);
+                    if (gap < minimumGap)
+                    {
+                        minimumGap = gap;
+                        worst = $"friendly #{index} at step {step}, engaged {units[index].IsEngaged}";
+                    }
+                }
+            }
+
+            Assert.That(minimumGap, Is.GreaterThanOrEqualTo(-SeparationDeadZone - 0.005f), worst);
+            // Not all eight fit around one body, but the front of the crowd must have reached it.
+            Assert.That(System.Array.Exists(units, unit => unit.IsEngaged), Is.True);
+
+            DestroyUnits(units);
+        }
+
+        [UnityTest]
+        public IEnumerator OneVersusEightMeleeCrowd_WaitingUnitsAdvanceOnceTheFrontRowLeaves()
+        {
+            CombatUnit[] units = CreateOneVersusEightCrowd();
+            for (int step = 0; step < SettleSteps; step++)
+            {
+                yield return new WaitForFixedUpdate();
+            }
+
+            var survivors = new System.Collections.Generic.List<CombatUnit> { units[0] };
+            for (int index = 1; index < units.Length; index++)
+            {
+                if (units[index].IsEngaged)
+                {
+                    Object.DestroyImmediate(units[index].gameObject);
+                }
+                else
+                {
+                    survivors.Add(units[index]);
+                }
+            }
+
+            Assert.That(survivors.Count, Is.GreaterThan(1), "every friendly was engaged; nobody was waiting");
+            for (int step = 0; step < SettleSteps; step++)
+            {
+                yield return new WaitForFixedUpdate();
+            }
+
+            Assert.That(survivors.Exists(unit => unit.Team == CombatTeam.Friendly && unit.IsEngaged), Is.True);
+            DestroyUnits(survivors.ToArray());
+        }
+
+        // Index 0 is the enemy at the origin; eight friendlies start on a ring around it.
+        private static CombatUnit[] CreateOneVersusEightCrowd()
+        {
+            var units = new CombatUnit[9];
+            units[0] = CreateUnit(CombatTeam.Enemy, Vector3.zero);
+            for (int index = 1; index < units.Length; index++)
+            {
+                float angle = (index - 1) * Mathf.PI / 4f + 0.1f;
+                units[index] = CreateUnit(
+                    CombatTeam.Friendly,
+                    new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * 1.5f);
+            }
+
+            Physics2D.SyncTransforms();
+            return units;
         }
 
         [Test]
