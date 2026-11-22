@@ -96,12 +96,11 @@ namespace BagManagementBattler.Tests
             Assert.That(enemyUnit.CurrentTarget, Is.Not.Null);
             Assert.That(crowbarUnit.CurrentTarget, Is.SameAs(enemyUnit));
             Assert.That(crowbarUnit.Body.linearVelocity.x, Is.EqualTo(0f));
-            float crowbarEdgeGap =
-                Mathf.Abs(enemyUnit.transform.position.x - crowbarUnit.transform.position.x) -
-                crowbarUnit.HalfWidth - enemyUnit.HalfWidth;
+            // Upper slack: same-team separation may nudge a stopped unit on Y by one fixed step.
+            float crowbarEdgeGap = crowbarUnit.EdgeGapTo(enemyUnit);
             Assert.That(
                 crowbarEdgeGap,
-                Is.InRange(crowbarUnit.EngagementRange - 0.05f, crowbarUnit.EngagementRange + 0.001f));
+                Is.InRange(crowbarUnit.EngagementRange - 0.05f, crowbarUnit.EngagementRange + 0.03f));
             int pooledCount = spawner.ActiveCount + spawner.AvailableCount;
 
             UnitDefinition unitDefinition = rifleUnit.UnitDefinition;

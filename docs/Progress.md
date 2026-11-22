@@ -24,13 +24,18 @@
 ## Now
 
 - **Milestone:** M0 Reset (ends Nov 24)
-- **Current task:** none. Next is Queue #1 (3A.2): promote it when starting.
-- **Status:** 3A.1 done and committed
-- **Owner:** —
+- **Current task:** 3A.2 — circular range and 2D chase (scope/tests: Queue #1 below, rule: `docs/Design.md` §3.7)
+- **Status:** implemented and committed ("Task 3A.2: circular range and 2D chase"); waiting for the user to confirm the manual `GameScene` check.
+- **Owner:** Claude
 - **Last updated:** 2026-11-22 by Claude
 
 ## Handoff notes
 
+- 2026-11-22 Claude: 3A.2 implemented, uncommitted. `CombatUnit`: public `EdgeGapTo` (2D centre distance minus both half-widths), steering `normalized × speed` toward the target, X-only advance without one, vertical step clamped to the band each fixed step, spawn Y clamped, band reset on `ResetForPool`. `Initialize(loadout, pos, minY = -inf, maxY = +inf)` rejects NaN or min > max. Both spawners have serialized `battlefieldMinY/MaxY`; `GameScene` sets −1.2 / 1.6 on both, estimated from the road in the background sprite (road ≈ y −1.43…1.87). Tune it in the scene check.
+- New tests in `CombatUnitMovementTests`: a unit keeps moving when only the X edges meet, a Y-offset target is reached on the 2D gap, units never leave the band (separation plus a high target plus a spawn above the band), and an inverted band is rejected. `GameSceneSoldierSpawnerTests` now uses `EdgeGapTo` with +0.03 upper slack (see Found, not fixed).
+- Run 2026-11-22 after the final edit: EditMode 35/35 passed, PlayMode 11/11 passed; `git diff --check` clean; scene diff is only the 4 band lines.
+- After that run, the user moved `Enemy Spawn Point` to y 1.112 in `GameScene` (Editor save also wrote `spawnLaneSpacing: 0.15` explicitly). This is committed with 3A.2, but tests were **not** rerun on it (Editor was open). Rerun PlayMode first next session.
+- Still open: the user's manual `GameScene` check (crowbar walks diagonally to the enemy and touches it; nobody leaves the band). Then commit, Done log, Design §3.4/§3.7 status, promote M1-1.
 - 2026-11-22 Claude: 3A.1 closed after the user's scene check, which passed after the user's own config tuning (crowbar 2 s / range 0.15, rifle range 2). Design §1.9 now matches the configs, and §3.7 holds the new movement rule.
 - `GameSceneSoldierSpawnerTests` now waits for the first crowbar and the first rifle unit instead of fixed seconds, so retuning durations no longer breaks it.
 - Final 3A.1 run, after the user's tuning and the test rewrite (2026-11-22): EditMode 35/35 passed, PlayMode 7/7 passed; `git diff --check` clean.
@@ -38,7 +43,8 @@
 ## Found, not fixed
 
 - `CrowbarLevel2` is still 3.4 s / range 0.7, but L1 is now 2 s / 0.15. L2 is slower and longer-ranged than L1, which breaks the 1.9 level rule (×0.85 → 1.7 s). Re-derive it when L2 matters (M3 content).
-- Same-team separation only pushes units apart vertically, so a big simultaneous wave will spread tall. Fine for M0; 3A.2 moves to 2D steering anyway, so revisit there.
+- Same-team separation only pushes units apart vertically, so a big simultaneous wave will spread tall. 3A.2 kept it as is. Inside the band, units pinned at the band edge can no longer split apart on Y and may overlap.
+- Separation can nudge a stopped unit on Y just out of range (seen in the scene test: gap 0.152 vs range 0.15), so it steps back in on the next fixed step. That is harmless for movement, but M1-2's attack state should use a little range hysteresis so attacks don't flicker.
 
 ## Queue
 

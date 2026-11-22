@@ -23,6 +23,8 @@ namespace BagManagementBattler.Combat
         private CapsuleCollider2D bodyCollider;
         private CombatUnit currentTarget;
         private float nextTargetRefreshTime;
+        private float bandMinY = float.NegativeInfinity;
+        private float bandMaxY = float.PositiveInfinity;
 
         public UnitDefinition UnitDefinition { get; private set; }
         public BagItemDefinition WeaponDefinition { get; private set; }
@@ -51,9 +53,12 @@ namespace BagManagementBattler.Combat
             }
 
             RefreshTargetIfNeeded();
-            body.linearVelocity = new Vector2(
-                ResolveHorizontalVelocity(),
-                ResolveSeparationVelocity());
+            Vector2 velocity = ResolveMoveVelocity() + Vector2.up * ResolveSeparationVelocity();
+            // Limit the vertical step so the next position stays inside the battlefield band.
+            float currentY = body.position.y;
+            float nextY = Mathf.Clamp(currentY + velocity.y * Time.fixedDeltaTime, bandMinY, bandMaxY);
+            velocity.y = (nextY - currentY) / Time.fixedDeltaTime;
+            body.linearVelocity = velocity;
         }
 
         private void OnDisable()
@@ -66,11 +71,20 @@ namespace BagManagementBattler.Combat
             currentTarget = null;
         }
 
-        public void Initialize(CombatUnitLoadout loadout, Vector3 spawnPosition)
+        public void Initialize(
+            CombatUnitLoadout loadout,
+            Vector3 spawnPosition,
+            float minY = float.NegativeInfinity,
+            float maxY = float.PositiveInfinity)
         {
             if (IsInitialized)
             {
                 throw new InvalidOperationException("The combat unit is already initialized.");
+            }
+
+            if (float.IsNaN(minY) || float.IsNaN(maxY) || minY > maxY)
+            {
+                throw new ArgumentException("The battlefield band needs minY <= maxY.");
             }
 
             EnsureBody();
@@ -79,6 +93,9 @@ namespace BagManagementBattler.Combat
             WeaponDefinition = loadout.WeaponDefinition;
             MovementSpeed = loadout.MovementSpeed;
             EngagementRange = loadout.EngagementRange;
+            bandMinY = minY;
+            bandMaxY = maxY;
+            spawnPosition.y = Mathf.Clamp(spawnPosition.y, minY, maxY);
 
             transform.SetPositionAndRotation(spawnPosition, Quaternion.identity);
             body.linearVelocity = Vector2.zero;
@@ -114,6 +131,8 @@ namespace BagManagementBattler.Combat
             WeaponDefinition = null;
             MovementSpeed = 0f;
             EngagementRange = 0f;
+            bandMinY = float.NegativeInfinity;
+            bandMaxY = float.PositiveInfinity;
             SetVisualFacing(1f);
             ClearVisuals();
         }
@@ -175,21 +194,26 @@ namespace BagManagementBattler.Combat
                    candidate.Team != Team;
         }
 
-        private float ResolveHorizontalVelocity()
+        public float EdgeGapTo(CombatUnit other)
+        {
+            float centreDistance = Vector2.Distance(transform.position, other.transform.position);
+            return centreDistance - HalfWidth - other.HalfWidth;
+        }
+
+        private Vector2 ResolveMoveVelocity()
         {
             if (IsValidTarget(currentTarget))
             {
-                float horizontalDelta = currentTarget.transform.position.x - transform.position.x;
-                float edgeGap = Mathf.Abs(horizontalDelta) - HalfWidth - currentTarget.HalfWidth;
-                if (edgeGap <= EngagementRange)
+                if (EdgeGapTo(currentTarget) <= EngagementRange)
                 {
-                    return 0f;
+                    return Vector2.zero;
                 }
 
-                return Mathf.Sign(horizontalDelta) * MovementSpeed;
+                Vector2 delta = currentTarget.transform.position - transform.position;
+                return delta.normalized * MovementSpeed;
             }
 
-            return Team == CombatTeam.Friendly ? MovementSpeed : -MovementSpeed;
+            return new Vector2(Team == CombatTeam.Friendly ? MovementSpeed : -MovementSpeed, 0f);
         }
 
         private float ResolveSeparationVelocity()

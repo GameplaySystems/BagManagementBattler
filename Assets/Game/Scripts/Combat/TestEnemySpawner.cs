@@ -11,6 +11,8 @@ namespace BagManagementBattler.Combat
         [SerializeField] private UnitDefinition enemyDefinition;
         [SerializeField] private BagItemDefinition weaponDefinition;
         [SerializeField] private bool spawnOnStart = true;
+        [SerializeField] private float battlefieldMinY = float.NegativeInfinity;
+        [SerializeField] private float battlefieldMaxY = float.PositiveInfinity;
 
         public CombatUnit SpawnedUnit { get; private set; }
 
@@ -34,7 +36,9 @@ namespace BagManagementBattler.Combat
             unit.name = "Test Enemy Unit";
             unit.Initialize(
                 new CombatUnitLoadout(enemyDefinition, weaponDefinition),
-                spawnAnchor.position);
+                spawnAnchor.position,
+                battlefieldMinY,
+                battlefieldMaxY);
             SpawnedUnit = unit;
             return unit;
         }

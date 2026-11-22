@@ -329,11 +329,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 62487cc9fcef445cbd00f7930d61d999, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: BagManagementBattler.Runtime::BagManagementBattler.Combat.SoldierSpawner
   unitPrefab: {fileID: 4979877340442591965, guid: f3fcab22a89afd24999200548d6cdb55, type: 3}
   spawnAnchor: {fileID: 521983373}
   prewarmCount: 4
+  spawnLaneSpacing: 0.15
+  battlefieldMinY: -1.2
+  battlefieldMaxY: 1.6
 --- !u!4 &1074557424
 Transform:
   m_ObjectHideFlags: 0
@@ -359,7 +362,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9321f517463d4d248e6aa760ef20f476, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: BagManagementBattler.Runtime::BagManagementBattler.Combat.BagProductionController
   soldierSpawner: {fileID: 1074557423}
   autoBeginForDebug: 1
@@ -466,7 +469,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalCameraData
   m_RenderShadows: 1
   m_RequiresDepthTextureOption: 2
@@ -542,7 +545,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b1a9b9f2859444e2af1c81007afc4ab4, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: BagManagementBattler.Runtime::BagManagementBattler.Bag.BagInteractionBootstrap
   gridDefinition: {fileID: 11400000, guid: 4686e60885bf4fe09b643c9cc797727c, type: 2}
   blueSoldier: {fileID: 11400000, guid: 17ade60b0e09489b855da7ad54c74841, type: 2}
@@ -598,13 +601,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 395a1da83f554635a1bc16cce24fc155, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: BagManagementBattler.Runtime::BagManagementBattler.Combat.TestEnemySpawner
   unitPrefab: {fileID: 4979877340442591965, guid: f3fcab22a89afd24999200548d6cdb55, type: 3}
   spawnAnchor: {fileID: 2100000004}
   enemyDefinition: {fileID: 11400000, guid: b42c8d520d624df098cf34aee4afe201, type: 2}
   weaponDefinition: {fileID: 11400000, guid: 081abce14ab34faca2a85685f432479e, type: 2}
   spawnOnStart: 1
+  battlefieldMinY: -1.2
+  battlefieldMaxY: 1.6
 --- !u!1 &2100000003
 GameObject:
   m_ObjectHideFlags: 0
@@ -630,7 +635,7 @@ Transform:
   m_GameObject: {fileID: 2100000003}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.8, y: 0.31, z: 0}
+  m_LocalPosition: {x: 2.8, y: 1.112, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
