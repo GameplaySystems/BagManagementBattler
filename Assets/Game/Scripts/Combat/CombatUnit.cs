@@ -10,7 +10,7 @@ namespace BagManagementBattler.Combat
     {
         [SerializeField] private Transform visualRoot;
         [SerializeField] private Transform handPoint;
-        [SerializeField, Min(0.1f)] private float acquisitionRange = 20f;
+        [SerializeField, Min(0.1f)] private float acquisitionRange = 3.5f;
         [SerializeField, Min(0.02f)] private float targetRefreshInterval = 0.1f;
         // Neighbour look-ahead beyond this unit's own body (query circle = body extent + this).
         [SerializeField, Min(0.01f)] private float separationRadius = 0.45f;
@@ -247,13 +247,19 @@ namespace BagManagementBattler.Combat
 
         private void RefreshTargetIfNeeded()
         {
-            if (IsValidTarget(currentTarget))
+            // An attack owns its target until AttackState releases it after death or range exit.
+            if (stateMachine.CurrentState is AttackState)
             {
                 return;
             }
 
-            currentTarget = null;
-            if (Time.time >= nextTargetRefreshTime)
+            if (!IsValidTarget(currentTarget))
+            {
+                currentTarget = null;
+            }
+
+            if (stateMachine.CurrentState is WalkState &&
+                Time.time >= nextTargetRefreshTime)
             {
                 RefreshTargetNow();
             }
@@ -266,10 +272,8 @@ namespace BagManagementBattler.Combat
                 acquisitionRange,
                 ContactFilter2D.noFilter,
                 targetCandidates);
-            ICombatTarget nearestUnit = null;
-            ICombatTarget nearestFallback = null;
-            float nearestUnitDistanceSquared = float.PositiveInfinity;
-            float nearestFallbackDistanceSquared = float.PositiveInfinity;
+            ICombatTarget nearest = null;
+            float nearestDistanceSquared = float.PositiveInfinity;
 
             for (int index = 0; index < candidateCount; index++)
             {
@@ -284,21 +288,14 @@ namespace BagManagementBattler.Combat
 
                 float distanceSquared =
                     (candidate.Position - body.position).sqrMagnitude;
-                if (candidate is CombatUnit && distanceSquared < nearestUnitDistanceSquared)
+                if (distanceSquared < nearestDistanceSquared)
                 {
-                    nearestUnit = candidate;
-                    nearestUnitDistanceSquared = distanceSquared;
-                }
-                else if (!(candidate is CombatUnit) && distanceSquared < nearestFallbackDistanceSquared)
-                {
-                    nearestFallback = candidate;
-                    nearestFallbackDistanceSquared = distanceSquared;
+                    nearest = candidate;
+                    nearestDistanceSquared = distanceSquared;
                 }
             }
 
-            // Units remain the first priority. The player base is a fallback only when no
-            // opposing unit is targetable, regardless of which target is geometrically nearer.
-            return nearestUnit ?? nearestFallback;
+            return nearest;
         }
 
         private bool IsValidTarget(ICombatTarget candidate)

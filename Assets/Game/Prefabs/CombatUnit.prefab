@@ -146,7 +146,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: BagManagementBattler.Runtime::BagManagementBattler.Combat.CombatUnit
   visualRoot: {fileID: 7340215598826614402}
   handPoint: {fileID: 2871348664172895302}
-  acquisitionRange: 20
+  acquisitionRange: 3.5
   targetRefreshInterval: 0.1
   separationRadius: 0.45
   separationSpeed: 1.5

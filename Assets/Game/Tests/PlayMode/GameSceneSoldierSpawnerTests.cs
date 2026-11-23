@@ -12,6 +12,18 @@ namespace BagManagementBattler.Tests
 {
     public sealed class GameSceneSoldierSpawnerTests
     {
+        [UnityTearDown]
+        public IEnumerator TearDown()
+        {
+            Scene loadedScene = SceneManager.GetActiveScene();
+            Scene cleanupScene = SceneManager.CreateScene("GameScene Test Cleanup");
+            SceneManager.SetActiveScene(cleanupScene);
+            if (loadedScene.IsValid() && loadedScene.isLoaded)
+            {
+                yield return SceneManager.UnloadSceneAsync(loadedScene);
+            }
+        }
+
         [UnityTest]
         public IEnumerator GameScene_ProducesConfiguredWeaponsFromAdjacentItems()
         {

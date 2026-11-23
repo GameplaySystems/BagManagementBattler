@@ -68,8 +68,59 @@ namespace BagManagementBattler.Tests
             Assert.That(enemy.gameObject.activeSelf, Is.True);
         }
 
+        [UnityTest]
+        public IEnumerator WalkingEnemy_TargetingBase_SwitchesToFriendlyPlacedInItsPath()
+        {
+            PlayerBase playerBase = CreatePlayerBase(Vector2.zero, includeHealthBar: false);
+            CombatUnit enemy = CreateStandaloneUnit(CombatTeam.Enemy, new Vector2(3f, 0f));
+            Physics2D.SyncTransforms();
+            enemy.RefreshTargetNow();
+
+            Assert.That(enemy.CurrentTarget, Is.SameAs(playerBase));
+            Assert.That(enemy.StateMachine.CurrentState, Is.TypeOf<WalkState>());
+
+            CombatUnit friendly = CreateStandaloneUnit(
+                CombatTeam.Friendly,
+                new Vector2(2f, 0f));
+            Physics2D.SyncTransforms();
+
+            for (int step = 0; step < 20 && enemy.CurrentTarget != friendly; step++)
+            {
+                yield return new WaitForFixedUpdate();
+            }
+
+            Assert.That(enemy.CurrentTarget, Is.SameAs(friendly));
+        }
+
+        [UnityTest]
+        public IEnumerator AttackingEnemy_KeepsBaseTarget_WhenNearerFriendlyAppears()
+        {
+            PlayerBase playerBase = CreatePlayerBase(Vector2.zero, includeHealthBar: false);
+            CombatUnit enemy = CreateStandaloneUnit(
+                CombatTeam.Enemy,
+                new Vector2(1f, 0f),
+                range: 1f);
+            Physics2D.SyncTransforms();
+            enemy.RefreshTargetNow();
+            yield return new WaitForFixedUpdate();
+
+            Assert.That(enemy.StateMachine.CurrentState, Is.TypeOf<AttackState>());
+            Assert.That(enemy.CurrentTarget, Is.SameAs(playerBase));
+
+            CombatUnit friendly = CreateStandaloneUnit(
+                CombatTeam.Friendly,
+                new Vector2(1.5f, 0f));
+            Physics2D.SyncTransforms();
+            yield return new WaitForSeconds(0.15f);
+            yield return new WaitForFixedUpdate();
+
+            Assert.That(enemy.StateMachine.CurrentState, Is.TypeOf<AttackState>());
+            Assert.That(enemy.CurrentTarget, Is.SameAs(playerBase));
+            Assert.That(enemy.CurrentTarget, Is.Not.SameAs(friendly));
+        }
+
         [Test]
-        public void EnemyPrefersFriendlyUnitOverNearerBase()
+        public void EnemyChoosesNearerBaseOverFartherFriendlyUnit()
         {
             PlayerBase playerBase = CreatePlayerBase(new Vector2(0.5f, 0f), includeHealthBar: false);
             CombatUnit friendly = CreateStandaloneUnit(CombatTeam.Friendly, new Vector2(3f, 0f));
@@ -78,8 +129,21 @@ namespace BagManagementBattler.Tests
 
             enemy.RefreshTargetNow();
 
-            Assert.That(enemy.CurrentTarget, Is.SameAs(friendly));
-            Assert.That(enemy.CurrentTarget, Is.Not.SameAs(playerBase));
+            Assert.That(enemy.CurrentTarget, Is.SameAs(playerBase));
+            Assert.That(enemy.CurrentTarget, Is.Not.SameAs(friendly));
+        }
+
+        [Test]
+        public void EnemyDoesNotAcquireBaseOutsideAcquisitionRange()
+        {
+            PlayerBase playerBase = CreatePlayerBase(Vector2.zero, includeHealthBar: false);
+            CombatUnit enemy = CreateStandaloneUnit(CombatTeam.Enemy, new Vector2(4f, 0f));
+            Physics2D.SyncTransforms();
+
+            enemy.RefreshTargetNow();
+
+            Assert.That(enemy.CurrentTarget, Is.Null);
+            Assert.That(playerBase.IsTargetable, Is.True);
         }
 
         [Test]
@@ -163,13 +227,16 @@ namespace BagManagementBattler.Tests
             return spawner;
         }
 
-        private CombatUnit CreateStandaloneUnit(CombatTeam team, Vector2 position)
+        private CombatUnit CreateStandaloneUnit(
+            CombatTeam team,
+            Vector2 position,
+            float range = 0.05f)
         {
             GameObject unitObject = new GameObject($"{team} Target Priority Unit");
             createdObjects.Add(unitObject);
             CombatUnit unit = unitObject.AddComponent<CombatUnit>();
             unitObject.GetComponent<CapsuleCollider2D>().size = new Vector2(0.2f, 0.4f);
-            unit.Initialize(CreateLoadout(team, 1f, 100f, 0.05f), position);
+            unit.Initialize(CreateLoadout(team, 1f, 100f, range), position);
             return unit;
         }
 

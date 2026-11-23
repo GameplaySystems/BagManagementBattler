@@ -259,7 +259,7 @@ Namespaces: `BagManagementBattler.Bag`, `.Combat`, `.Flow`, `.Economy`, `.UI`, `
 | `UnitDefinition`, `UnitCatalog` | SO | per-team/archetype/level body stats and visuals | done (HP: next) |
 | `CombatUnitLoadout` | value | unit def + weapon def → final stats | done |
 | `ICombatTarget` | interface | shared position, collider, team, targetability and damage contract for units and the player base | done (M1-3) |
-| `CombatUnit` | MB | one unit: initialize, coordinate its state machine, and provide movement, separation, sensing and attack operations; implements `ICombatTarget`; mirrors its visual root for the enemy team; movement per 3.7 | done (3A.2–3A.4, M1-2, M1-2b) |
+| `CombatUnit` | MB | one unit: initialize, coordinate its state machine, and provide movement, separation, sensing and attack operations; implements `ICombatTarget`; mirrors its visual root for the enemy team; movement per 3.7 | done (3A.2–3A.4, M1-2, M1-2b, M1-3) |
 | `UnitVisualLayout` | static | visual sizing helper | done |
 | `BagProductionController` | MB | session lifecycle, ticking, forwards requests | done |
 | `UnitSpawner` | MB | pool, acquire/init/release, track active, recycle all; one instance per team (serialized `team`; `Spawn(CombatUnitLoadout)` rejects other teams) | done (M1-1, M1-3) |
@@ -319,9 +319,10 @@ EditMode for every rule owner and every config `Validate()`; at least one test p
 Owned by `CombatUnit` and applied through its kinematic `Rigidbody2D` velocity every fixed step.
 
 - **Range** is a 2D edge-to-edge distance between the two units' real colliders (`Physics2D.Distance`; negative while they overlap). A unit is in range when that distance ≤ its weapon's engagement range. Melee ranges are therefore near zero and mean "touching".
+- **Target acquisition:** while in `WalkState`, a unit rescans every `targetRefreshInterval` (0.1 s) and chooses the nearest targetable opposing `ICombatTarget`—unit or base—within its serialized `acquisitionRange` (3.5 world units by default). The current walking target may change when a nearer valid target appears. This bounded scan replaces battlefield-wide target lock.
 - **With a target:** the unit steers straight toward the target on both axes (normalised direction × movement speed) until in range, then stops.
-- **Base siege:** `CombatUnit` and `PlayerBase` implement `ICombatTarget`. A unit always prioritizes the nearest targetable opposing `CombatUnit`, preserving unit-vs-unit behavior. Only when an enemy finds no targetable friendly unit does it target the friendly `PlayerBase`; it then chases, enters the same `AttackState`, and applies its normal weapon damage on the normal cooldown and range. Friendly units never target the friendly base. Enemies are not recycled when they reach or attack it.
-- **Engagement hysteresis:** a unit becomes *engaged* at gap ≤ range and lets go only at gap > range + `engagementMargin` (0.05). Engaged units do not steer (separation still applies). Changing or losing the target clears it.
+- **Base siege:** `CombatUnit` and `PlayerBase` implement `ICombatTarget`, so the friendly `PlayerBase` participates in the same nearest-target acquisition as friendly units. An enemy that acquires it chases, enters the same `AttackState`, and applies its normal weapon damage on the normal cooldown and range. Friendly units never target the friendly base. Enemies are not recycled when they reach or attack it.
+- **Attack target retention and engagement hysteresis:** after entering `AttackState`, a unit keeps that target and does not rescan. It lets go only when the target dies/becomes invalid or its collider gap exceeds range + `engagementMargin` (0.05), then returns to walking and reacquires. Engaged units do not steer (separation still applies).
 - **Velocity smoothing:** the body velocity moves toward the desired velocity (move + separation) at `MovementSpeed × velocityResponse` (10) per second instead of jumping to it.
 - **Without a target:** the unit advances along X only (friendly +X, enemy −X).
 - **Battlefield band:** Y is clamped to the battlefield's min/max Y every step (spawn Y included); no unit ever leaves the band. The band is serialized on each spawner (`battlefieldMinY`/`battlefieldMaxY`, set in `GameScene`) and passed to `CombatUnit.Initialize`.
@@ -331,7 +332,7 @@ Owned by `CombatUnit` and applied through its kinematic `Rigidbody2D` velocity e
 - **No pathfinding** (see 1.14): no obstacle avoidance or routing, just straight steering plus separation.
 - **Depth sorting:** sorting layers back to front: Background, Battlefield, Effects, Bag, UI (Default sits below them and should stay unused). Each `CombatUnit` root has a `SortingGroup` on Battlefield (order 0) and the tent is on Battlefield too, so the 2D renderer's custom transparency sort axis (0, 1, 0) draws lower units in front. Bag sprites are on Bag; the battlefield image is on Background. The spawners draw the band's min/max Y as Scene-view Gizmo lines.
 
-Status: range/chase implemented in 3A.2; collider range, 2D separation, depth sorting and band Gizmos in 3A.3 (scene check passed); hysteresis, smoothing, dead zone, waiting and opponent non-overlap in 3A.4 (scene check passed).
+Status: range/chase implemented in 3A.2; collider range, 2D separation, depth sorting and band Gizmos in 3A.3 (scene check passed); hysteresis, smoothing, dead zone, waiting and opponent non-overlap in 3A.4 (scene check passed); bounded nearest-target reacquisition and sticky attack targets completed in M1-3 (browser check passed 2026-11-23). 3A.5 remains queued because waiting chains can still form behind a saturated front line.
 
 ---
 
@@ -343,14 +344,14 @@ Status: range/chase implemented in 3A.2; collider range, 2D separation, depth so
 
 ## Part 5 — Milestones (hard dates)
 
-| Milestone | Dates | Exit criteria |
-|---|---|---|
-| **M0 Reset** | Nov 22–24 | Task 3A.1 fixes (see 5.1) pass manual check; local work committed and pushed; this doc adopted; GPT working docs retired |
-| **M1 Combat** | Nov 24–28 | `UnitSpawner` rename; Health, states, melee/ranged direct damage, death, recycle-once; enemies siege `PlayerBase` through the shared combat-target rules; WebGL portrait smoke build runs in a browser |
-| **M2 Loop** | Nov 29 – Dec 4 | `WaveRunner` + definitions; `GameFlowController` phases, locks, camera, result; `Wallet`, `Shop`, reroll, sell-on-battle; expansion; lives and run end. **Ugly but complete 10-wave run.** |
-| **M3 Content** | Dec 5–10 | 4 weapons × 3 levels, Recruit × 3, 3 enemies, 2 bosses, 10 waves authored; first balance pass against 1.7 and 1.9 |
-| **M4 Shell** | Dec 11–15 | all screens in 1.11, hint banners, PlayerPrefs, audio in, credits file complete |
-| **M5 Ship** | Dec 16–20 | feedback/juice from 1.12; 3–5 outside playtesters; bug fixes; itch page with GIF, screenshots and AI disclosure; README with play link. **Publish Dec 20.** |
+| Milestone | Status | Dates | Exit criteria |
+|---|---|---|---|
+| **M0 Reset** | **[done]** | Nov 22–24 | Task 3A.1 fixes (see 5.1) pass manual check; local work committed and pushed; this doc adopted; GPT working docs retired |
+| **M1 Combat** | **[done]** | Nov 24–28 | `UnitSpawner` rename; Health, states, melee/ranged direct damage, death, recycle-once; enemies siege `PlayerBase` through the shared combat-target rules; WebGL portrait smoke build runs in a browser. M1-3 browser acceptance passed 2026-11-23. |
+| **M2 Loop** | **[next]** | Nov 29 – Dec 4 | `WaveRunner` + definitions; `GameFlowController` phases, locks, camera, result; `Wallet`, `Shop`, reroll, sell-on-battle; expansion; lives and run end. **Ugly but complete 10-wave run.** |
+| **M3 Content** | **[planned]** | Dec 5–10 | 4 weapons × 3 levels, Recruit × 3, 3 enemies, 2 bosses, 10 waves authored; first balance pass against 1.7 and 1.9 |
+| **M4 Shell** | **[planned]** | Dec 11–15 | all screens in 1.11, hint banners, PlayerPrefs, audio in, credits file complete |
+| **M5 Ship** | **[planned]** | Dec 16–20 | feedback/juice from 1.12; 3–5 outside playtesters; bug fixes; itch page with GIF, screenshots and AI disclosure; README with play link. **Publish Dec 20.** |
 
 Scope rule: if a milestone slips by more than one day, cut from M3 content or 1.12 juice — never extend the dates.
 
