@@ -5,7 +5,7 @@ namespace BagManagementBattler.Combat
     public sealed class WaitingState : IUnitState
     {
         private readonly CombatUnit unit;
-        private CombatUnit targetOnEnter;
+        private ICombatTarget targetOnEnter;
 
         internal WaitingState(CombatUnit unit) => this.unit = unit;
         public void Enter() => targetOnEnter = unit.CurrentTarget;

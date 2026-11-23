@@ -124,6 +124,34 @@ namespace BagManagementBattler.Tests
             Assert.That(target.gameObject.activeSelf, Is.False);
         }
 
+        [UnityTest]
+        public IEnumerator DeathReleaseAndRecycleAll_SameFrame_ReturnsUnitExactlyOnce()
+        {
+            BagItemDefinition passiveWeapon = CreateWeapon(
+                AttackStyle.Melee,
+                1f,
+                BagItemDefinition.NonLethalTestAttackCooldown);
+            UnitSpawner spawner = CreateSpawner(CombatTeam.Enemy, Vector2.zero);
+            UnitDefinition definition = CreateUnitDefinition(CombatTeam.Enemy, 10f);
+            CombatUnit unit = spawner.Spawn(new CombatUnitLoadout(definition, passiveWeapon));
+
+            unit.TakeDamage(10f);
+            Assert.That(unit.StateMachine.CurrentState, Is.TypeOf<DeathState>());
+
+            // Death and battle cleanup can both request release during one frame.
+            unit.ReleaseToOwner();
+            spawner.RecycleAll();
+            yield return null;
+
+            Assert.That(spawner.ActiveCount, Is.Zero);
+            Assert.That(spawner.AvailableCount, Is.EqualTo(1));
+            Assert.That(unit.gameObject.activeSelf, Is.False);
+
+            CombatUnit reused = spawner.Spawn(new CombatUnitLoadout(definition, passiveWeapon));
+            Assert.That(reused, Is.SameAs(unit));
+            Assert.That(spawner.AvailableCount, Is.Zero);
+        }
+
         [Test]
         public void PoolRelease_ClearsActiveHitFlash()
         {
@@ -305,7 +333,7 @@ namespace BagManagementBattler.Tests
         private static string Describe(CombatUnit unit)
         {
             string target = unit.CurrentTarget != null
-                ? $"{unit.CurrentTarget.Body.position} gap {unit.EdgeGapTo(unit.CurrentTarget):F3}"
+                ? $"{unit.CurrentTarget.Position} gap {unit.EdgeGapTo(unit.CurrentTarget):F3}"
                 : "none";
             return $"{unit.StateMachine.CurrentState?.GetType().Name} pos {unit.Body.position} " +
                    $"vel {unit.Body.linearVelocity} target {target}";

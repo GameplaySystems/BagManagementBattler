@@ -113,7 +113,7 @@ These are starting targets, not live values. During development the config asset
 | Expansion prices | 4, 6, 8, 10, … (+2 each) |
 | Wave reward | 8 + wave number; boss waves +5 |
 | Loss consolation | 4 |
-| Base HP | 20; enemy contact deals 1 (boss 5), then the enemy is recycled |
+| Base HP | 100 (testing value); enemies siege it with their normal weapon damage, cooldown and range |
 | Level scaling | weapon damage ×1.4, production duration ×0.85 per level (≈1.65× output) |
 
 | Weapon L1 | Damage | Attack cooldown | Range | Production | Speed × |
@@ -258,14 +258,15 @@ Namespaces: `BagManagementBattler.Bag`, `.Combat`, `.Flow`, `.Economy`, `.UI`, `
 |---|---|---|---|
 | `UnitDefinition`, `UnitCatalog` | SO | per-team/archetype/level body stats and visuals | done (HP: next) |
 | `CombatUnitLoadout` | value | unit def + weapon def → final stats | done |
-| `CombatUnit` | MB | one unit: initialize, coordinate its state machine, and provide movement, separation, sensing and attack operations; mirrors its visual root for the enemy team; movement per 3.7 | done (3A.2–3A.4, M1-2, M1-2b) |
+| `ICombatTarget` | interface | shared position, collider, team, targetability and damage contract for units and the player base | next |
+| `CombatUnit` | MB | one unit: initialize, coordinate its state machine, and provide movement, separation, sensing and attack operations; implements `ICombatTarget`; mirrors its visual root for the enemy team; movement per 3.7 | done (3A.2–3A.4, M1-2, M1-2b) |
 | `UnitVisualLayout` | static | visual sizing helper | done |
 | `BagProductionController` | MB | session lifecycle, ticking, forwards requests | done |
 | `UnitSpawner` | MB | pool, acquire/init/release, track active, recycle all; one instance per team (serialized `team`; `Spawn(CombatUnitLoadout)` rejects other teams) | rename + per-team done (M1-1, scene check passed); recycle all: M1-3 |
 | `TestEnemySpawner` | MB | debug fixture: spawns `enemyCount` copies of one enemy loadout, `spawnInterval` apart, spread across the band, through the enemy `UnitSpawner` | delete when `WaveRunner` lands |
 | `Health` | C# | current/max, damage, `Depleted` event | done (M1-2) |
 | `UnitStateMachine`, `IUnitState` + states | C# | Walk, Waiting, Attack, Death; each state owns its behavior and transitions | done (M1-2b) |
-| `PlayerBase` | MB | base `Health`, enemy contact | next |
+| `PlayerBase` | MB | friendly `ICombatTarget` with base `Health` and depletion event; no loss flow until M2 | next |
 | `WaveDefinition`, `WaveSpawnEntry` | SO / data | start time, enemy unit def, weapon def, count, interval, boss flag | planned |
 | `WaveRunner` | MB | runs one wave schedule through the enemy `UnitSpawner`, reports schedule complete | planned |
 
@@ -295,6 +296,7 @@ Namespaces: `BagManagementBattler.Bag`, `.Combat`, `.Flow`, `.Economy`, `.UI`, `
 |---|---|---|
 | `ShopView`, `HudView`, `ResultView`, `RunEndView`, `PauseView`, `SettingsView`, `MainMenuView`, `CreditsView`, `HintBannerView` | screens in 1.11 | planned |
 | `UnitFeedback` | hit flash (MaterialPropertyBlock, `SpriteFlash` material), knockback, DOTween death squash + fade; kills tweens on release | done (M1-2); death poof: polish backlog |
+| `PlayerBaseHealthBar` | MB | simple world-space base-health display above the tent | next |
 | `AudioPlayer` + `SoundLibrary` (SO) | plays named cues; referenced explicitly | planned |
 | `SettingsStore`, `ProgressStore` | PlayerPrefs read/write | planned |
 
@@ -318,6 +320,7 @@ Owned by `CombatUnit` and applied through its kinematic `Rigidbody2D` velocity e
 
 - **Range** is a 2D edge-to-edge distance between the two units' real colliders (`Physics2D.Distance`; negative while they overlap). A unit is in range when that distance ≤ its weapon's engagement range. Melee ranges are therefore near zero and mean "touching".
 - **With a target:** the unit steers straight toward the target on both axes (normalised direction × movement speed) until in range, then stops.
+- **Base siege:** `CombatUnit` and `PlayerBase` implement `ICombatTarget`. A unit always prioritizes the nearest targetable opposing `CombatUnit`, preserving unit-vs-unit behavior. Only when an enemy finds no targetable friendly unit does it target the friendly `PlayerBase`; it then chases, enters the same `AttackState`, and applies its normal weapon damage on the normal cooldown and range. Friendly units never target the friendly base. Enemies are not recycled when they reach or attack it.
 - **Engagement hysteresis:** a unit becomes *engaged* at gap ≤ range and lets go only at gap > range + `engagementMargin` (0.05). Engaged units do not steer (separation still applies). Changing or losing the target clears it.
 - **Velocity smoothing:** the body velocity moves toward the desired velocity (move + separation) at `MovementSpeed × velocityResponse` (10) per second instead of jumping to it.
 - **Without a target:** the unit advances along X only (friendly +X, enemy −X).
@@ -343,7 +346,7 @@ Status: range/chase implemented in 3A.2; collider range, 2D separation, depth so
 | Milestone | Dates | Exit criteria |
 |---|---|---|
 | **M0 Reset** | Nov 22–24 | Task 3A.1 fixes (see 5.1) pass manual check; local work committed and pushed; this doc adopted; GPT working docs retired |
-| **M1 Combat** | Nov 24–28 | `UnitSpawner` rename; Health, states, melee/ranged direct damage, death, recycle-once; `PlayerBase` + contact damage; WebGL portrait smoke build runs in a browser |
+| **M1 Combat** | Nov 24–28 | `UnitSpawner` rename; Health, states, melee/ranged direct damage, death, recycle-once; enemies siege `PlayerBase` through the shared combat-target rules; WebGL portrait smoke build runs in a browser |
 | **M2 Loop** | Nov 29 – Dec 4 | `WaveRunner` + definitions; `GameFlowController` phases, locks, camera, result; `Wallet`, `Shop`, reroll, sell-on-battle; expansion; lives and run end. **Ugly but complete 10-wave run.** |
 | **M3 Content** | Dec 5–10 | 4 weapons × 3 levels, Recruit × 3, 3 enemies, 2 bosses, 10 waves authored; first balance pass against 1.7 and 1.9 |
 | **M4 Shell** | Dec 11–15 | all screens in 1.11, hint banners, PlayerPrefs, audio in, credits file complete |

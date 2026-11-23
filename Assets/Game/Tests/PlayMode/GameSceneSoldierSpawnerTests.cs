@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using BagManagementBattler.Bag;
 using BagManagementBattler.Combat;
+using BagManagementBattler.Presentation;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -23,6 +24,12 @@ namespace BagManagementBattler.Tests
             Assert.That(tent, Is.Not.Null);
             Assert.That(spawnerObject, Is.Not.Null);
             Assert.That(enemySpawnerObject, Is.Not.Null);
+            PlayerBase playerBase = tent.GetComponent<PlayerBase>();
+            Assert.That(playerBase, Is.Not.Null);
+            Assert.That(playerBase.Health.Max, Is.EqualTo(100f));
+            Assert.That(tent.GetComponent<PlayerBaseHealthBar>(), Is.Not.Null);
+            Assert.That(tent.transform.Find("Health Bar/Background/Fill"), Is.Not.Null);
+            Assert.That(tent.GetComponent<Collider2D>().isTrigger, Is.True);
 
             UnitSpawner spawner = spawnerObject.GetComponent<UnitSpawner>();
             BagProductionController controller =

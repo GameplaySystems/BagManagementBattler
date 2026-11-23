@@ -25,12 +25,13 @@
 
 - **Milestone:** M1 Combat (Nov 24–28)
 - **Current task:** M1-3 (Queue #1 below).
-- **Status:** not started
-- **Owner:** —
+- **Status:** blocked — steps 1–3 complete; WebGL module missing
+- **Owner:** Codex
 - **Last updated:** 2026-11-23 by Codex
 
 ## Handoff notes
 
+- 2026-11-23 Codex: M1-3 steps 1–3 complete under the revised siege design and included in the user-requested commit/push from `9d9168a`. Added idempotent `UnitSpawner.RecycleAll` plus same-frame death/cleanup coverage. Added minimal `ICombatTarget` implemented by `CombatUnit` and the 100-HP `PlayerBase`: enemies preserve nearest-friendly-unit priority, fall back to the base only with no friendly unit target, then use the same chase/range/`AttackState`/weapon damage/cooldown and remain active; friendly units cannot target their base. Added `PlayerBaseHealthBar` as a separate world-space presentation component. Updated Design §1.9, script map, movement/base rules and M1 exit wording. Final tests: focused UnitSpawner 6/6, release-once 1/1, PlayerBase 5/5, combined base + targeting + movement + combat 27/27, destroyed-target regression 1/1, scene wiring 1/1; full EditMode 46/46 and PlayMode 33/33 — all passed. `git diff --check` clean. Step 4 remains blocked because Unity 6000.3.17f1 has no `WebGLSupport` playback engine; Player Settings/build remain unattempted.
 - 2026-11-23 Codex: M1-2b scene check passed with unchanged behavior; closing in commit `M1-2b: real unit state pattern` and promoting M1-3. Removed Idle, consolidated melee/ranged into one config-driven `AttackState`, and moved behavior/transitions/timers into the states. Only the 3 approved class-name assertions changed. Tests this session: focused combat 11/11, focused movement + targeting 11/11, full EditMode 45/45, full PlayMode 27/27 — all passed.
 - 2026-11-23 Claude: M1-2 committed and pushed after the user's scene check (see Done log). Next is M1-2b. User decision 2026-11-23: the 3 asserts in `CombatUnitCombatTests` that name `MeleeAttackState`/`RangedAttackState` may be updated to the single `AttackState`; every other test stays unedited. Config values (speeds, rifle range 1) are testing values; Design §1.9 now says configs are authoritative until M3 balance, so don't sync them into the doc.
 
@@ -44,7 +45,7 @@
 ## Queue
 
 1. **M1-3 — recycle safety, player base and smoke build**
-   - **Scope:** death → release at most once; `UnitSpawner.RecycleAll` (wave cleanup: release every active unit once, safe when a death release lands in the same frame); `PlayerBase` + contact damage; WebGL portrait smoke build.
+   - **Scope:** death → release at most once; `UnitSpawner.RecycleAll` (wave cleanup: release every active unit once, safe when a death release lands in the same frame); `PlayerBase` siege through shared combat-target rules + world-space health bar; WebGL portrait smoke build.
 2. **3A.5 — attack slots and retarget** (rule: `docs/Design.md` §3.7)
    - **Scope:** 6–8 melee slots on a ring around each target; a melee unit claims the nearest free slot and steers to that point; no free slot → retarget to the nearest enemy that has one; wait only if no enemy has a free slot. Ranged units never take slots. Slots are released on death, retarget and pool release (release-once).
    - **Why:** the 3A.4 waiting rule chains through ranks, so later units wait behind the crowd instead of moving to another target (accepted trade-off for now).

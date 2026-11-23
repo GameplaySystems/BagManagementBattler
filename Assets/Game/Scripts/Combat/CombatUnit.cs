@@ -6,7 +6,7 @@ using UnityEngine;
 namespace BagManagementBattler.Combat
 {
     [RequireComponent(typeof(Rigidbody2D), typeof(CapsuleCollider2D))]
-    public sealed class CombatUnit : MonoBehaviour
+    public sealed class CombatUnit : MonoBehaviour, ICombatTarget
     {
         [SerializeField] private Transform visualRoot;
         [SerializeField] private Transform handPoint;
@@ -36,7 +36,7 @@ namespace BagManagementBattler.Combat
         private Rigidbody2D body;
         private CapsuleCollider2D bodyCollider;
         private UnitFeedback feedback;
-        private CombatUnit currentTarget;
+        private ICombatTarget currentTarget;
         private float nextTargetRefreshTime;
         private Vector2 separationVelocity;
         private Vector2 crowdBlockDirection;
@@ -62,7 +62,9 @@ namespace BagManagementBattler.Combat
         public Rigidbody2D Body => body;
         public Transform VisualRoot => visualRoot;
         public Transform HandPoint => handPoint;
-        public CombatUnit CurrentTarget => currentTarget;
+        public ICombatTarget CurrentTarget => currentTarget;
+        public Vector2 Position => body != null ? body.position : (Vector2)transform.position;
+        public Collider2D Collider => bodyCollider;
         /// <summary>In attack range of the current target (with hysteresis); engaged units do not steer.</summary>
         public bool IsEngaged => stateMachine?.CurrentState is AttackState;
         /// <summary>Engaged, or waiting behind a resting teammate nearer the target; resting units do not steer.</summary>
@@ -257,21 +259,23 @@ namespace BagManagementBattler.Combat
             }
         }
 
-        private CombatUnit FindNearestTarget()
+        private ICombatTarget FindNearestTarget()
         {
             int candidateCount = Physics2D.OverlapCircle(
                 transform.position,
                 acquisitionRange,
                 ContactFilter2D.noFilter,
                 targetCandidates);
-            CombatUnit nearest = null;
-            float nearestDistanceSquared = float.PositiveInfinity;
+            ICombatTarget nearestUnit = null;
+            ICombatTarget nearestFallback = null;
+            float nearestUnitDistanceSquared = float.PositiveInfinity;
+            float nearestFallbackDistanceSquared = float.PositiveInfinity;
 
             for (int index = 0; index < candidateCount; index++)
             {
                 Collider2D candidateCollider = targetCandidates[index];
-                CombatUnit candidate = candidateCollider != null
-                    ? candidateCollider.GetComponent<CombatUnit>()
+                ICombatTarget candidate = candidateCollider != null
+                    ? candidateCollider.GetComponent<ICombatTarget>()
                     : null;
                 if (!IsValidTarget(candidate))
                 {
@@ -279,25 +283,38 @@ namespace BagManagementBattler.Combat
                 }
 
                 float distanceSquared =
-                    ((Vector2)candidate.transform.position - (Vector2)transform.position).sqrMagnitude;
-                if (distanceSquared < nearestDistanceSquared)
+                    (candidate.Position - body.position).sqrMagnitude;
+                if (candidate is CombatUnit && distanceSquared < nearestUnitDistanceSquared)
                 {
-                    nearest = candidate;
-                    nearestDistanceSquared = distanceSquared;
+                    nearestUnit = candidate;
+                    nearestUnitDistanceSquared = distanceSquared;
+                }
+                else if (!(candidate is CombatUnit) && distanceSquared < nearestFallbackDistanceSquared)
+                {
+                    nearestFallback = candidate;
+                    nearestFallbackDistanceSquared = distanceSquared;
                 }
             }
 
-            return nearest;
+            // Units remain the first priority. The player base is a fallback only when no
+            // opposing unit is targetable, regardless of which target is geometrically nearer.
+            return nearestUnit ?? nearestFallback;
         }
 
-        private bool IsValidTarget(CombatUnit candidate)
+        private bool IsValidTarget(ICombatTarget candidate)
         {
-            return candidate != null &&
-                   candidate != this &&
-                   candidate.IsTargetable &&
-                   candidate.isActiveAndEnabled &&
-                   candidate.gameObject.activeInHierarchy &&
-                   candidate.Team != Team;
+            if (candidate == null || ReferenceEquals(candidate, this))
+            {
+                return false;
+            }
+
+            // Unity's destroyed-object null check is not preserved by an interface reference.
+            if (candidate is UnityEngine.Object unityObject && unityObject == null)
+            {
+                return false;
+            }
+
+            return candidate.IsTargetable && candidate.Team != Team;
         }
 
         /// <summary>Scene-view lines at the battlefield band's min/max Y, drawn by the spawners.</summary>
@@ -317,9 +334,9 @@ namespace BagManagementBattler.Combat
         }
 
         /// <summary>Collider edge-to-edge distance; negative while the bodies overlap.</summary>
-        public float EdgeGapTo(CombatUnit other)
+        public float EdgeGapTo(ICombatTarget other)
         {
-            ColliderDistance2D distance = Physics2D.Distance(bodyCollider, other.bodyCollider);
+            ColliderDistance2D distance = Physics2D.Distance(bodyCollider, other.Collider);
             return distance.isValid ? distance.distance : float.PositiveInfinity;
         }
 
@@ -355,7 +372,7 @@ namespace BagManagementBattler.Combat
 
         internal Vector2 ResolveChaseSlide()
         {
-            Vector2 steer = (currentTarget.body.position - body.position).normalized * MovementSpeed;
+            Vector2 steer = (currentTarget.Position - body.position).normalized * MovementSpeed;
             float into = Vector2.Dot(steer, crowdBlockDirection);
             return into > 0f ? steer - crowdBlockDirection * into : steer;
         }
@@ -372,21 +389,22 @@ namespace BagManagementBattler.Combat
 
         internal void PerformAttack()
         {
-            CombatUnit primaryTarget = currentTarget;
+            ICombatTarget primaryTarget = currentTarget;
             if (!IsAlive || !IsValidTarget(primaryTarget))
             {
                 return;
             }
 
             areaHitTargets.Clear();
-            if (WeaponDefinition.AreaHitRadius <= 0f)
+            CombatUnit primaryUnit = primaryTarget as CombatUnit;
+            if (primaryUnit != null && WeaponDefinition.AreaHitRadius <= 0f)
             {
-                areaHitTargets.Add(primaryTarget);
+                areaHitTargets.Add(primaryUnit);
             }
-            else
+            else if (primaryUnit != null)
             {
                 int candidateCount = Physics2D.OverlapCircle(
-                    primaryTarget.body.position,
+                    primaryTarget.Position,
                     WeaponDefinition.AreaHitRadius,
                     ContactFilter2D.noFilter,
                     targetCandidates);
@@ -398,31 +416,41 @@ namespace BagManagementBattler.Combat
                         ? candidateCollider.GetComponent<CombatUnit>()
                         : null;
                     if (IsValidTarget(candidate) &&
-                        (candidate.body.position - primaryTarget.body.position).sqrMagnitude <= radiusSquared &&
+                        (candidate.body.position - primaryTarget.Position).sqrMagnitude <= radiusSquared &&
                         !areaHitTargets.Contains(candidate))
                     {
                         areaHitTargets.Add(candidate);
                     }
                 }
 
-                if (!areaHitTargets.Contains(primaryTarget))
+                if (!areaHitTargets.Contains(primaryUnit))
                 {
-                    areaHitTargets.Add(primaryTarget);
+                    areaHitTargets.Add(primaryUnit);
                 }
             }
 
-            if (WeaponDefinition.KnockbackDistance > 0f)
+            if (primaryUnit != null && WeaponDefinition.KnockbackDistance > 0f)
             {
-                Vector2 hitDirection = primaryTarget.body.position - body.position;
+                Vector2 hitDirection = primaryTarget.Position - body.position;
                 if (hitDirection.sqrMagnitude <= 0.00000001f)
                 {
                     hitDirection = Team == CombatTeam.Friendly ? Vector2.right : Vector2.left;
                 }
 
-                primaryTarget.BeginKnockback(hitDirection, WeaponDefinition.KnockbackDistance);
+                primaryUnit.BeginKnockback(hitDirection, WeaponDefinition.KnockbackDistance);
             }
 
             successfulAttackCount++;
+
+            if (primaryUnit == null)
+            {
+                if (IsAlive && primaryTarget.IsTargetable)
+                {
+                    primaryTarget.TakeDamage(WeaponDefinition.Damage);
+                }
+
+                return;
+            }
 
             foreach (CombatUnit target in areaHitTargets)
             {
@@ -512,7 +540,7 @@ namespace BagManagementBattler.Combat
                 return false;
             }
 
-            Vector2 target = currentTarget.body.position;
+            Vector2 target = currentTarget.Position;
             return (teammate.body.position - target).sqrMagnitude < (body.position - target).sqrMagnitude;
         }
 

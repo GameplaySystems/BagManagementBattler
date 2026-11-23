@@ -92,6 +92,25 @@ namespace BagManagementBattler.Tests
         }
 
         [Test]
+        public void RecycleAll_ReleasesEveryActiveUnit_AndIsSafeToRepeat()
+        {
+            UnitSpawner spawner = CreateSpawner(1, out _);
+            ProductionRequest request = CreateRequest(1f);
+            CombatUnit first = spawner.Spawn(request.ToLoadout());
+            CombatUnit second = spawner.Spawn(request.ToLoadout());
+
+            spawner.RecycleAll();
+
+            Assert.That(spawner.ActiveCount, Is.Zero);
+            Assert.That(spawner.AvailableCount, Is.EqualTo(2));
+            Assert.That(first.gameObject.activeSelf, Is.False);
+            Assert.That(second.gameObject.activeSelf, Is.False);
+
+            spawner.RecycleAll();
+            Assert.That(spawner.AvailableCount, Is.EqualTo(2));
+        }
+
+        [Test]
         public void Release_RejectsForeignAndAlreadyReleasedUnits()
         {
             UnitSpawner spawner = CreateSpawner(1, out _);

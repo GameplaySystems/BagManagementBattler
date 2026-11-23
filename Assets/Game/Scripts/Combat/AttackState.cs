@@ -6,7 +6,7 @@ namespace BagManagementBattler.Combat
     public sealed class AttackState : IUnitState
     {
         private readonly CombatUnit unit;
-        private CombatUnit targetOnEnter;
+        private ICombatTarget targetOnEnter;
         private AttackStyle attackStyle;
         private float nextAttackTime;
 

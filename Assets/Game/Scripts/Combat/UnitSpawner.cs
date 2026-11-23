@@ -138,6 +138,19 @@ namespace BagManagementBattler.Combat
             return true;
         }
 
+        public void RecycleAll()
+        {
+            EnsureInitialized();
+
+            // Release mutates activeUnits, so iterate a snapshot. Release itself is the
+            // single idempotency gate shared with delayed death releases.
+            var unitsToRecycle = new List<CombatUnit>(activeUnits);
+            foreach (CombatUnit unit in unitsToRecycle)
+            {
+                Release(unit);
+            }
+        }
+
         private CombatUnit CreateUnit()
         {
             CombatUnit unit = Instantiate(unitPrefab, transform);
