@@ -29,13 +29,13 @@ namespace BagManagementBattler.Tests
         [UnityTest]
         public IEnumerator MeleeUnit_KillsTenHealthTargetInThreeHits()
         {
-            yield return AssertKillsInThreeHits(AttackStyle.Melee, typeof(MeleeAttackState));
+            yield return AssertKillsInThreeHits(AttackStyle.Melee);
         }
 
         [UnityTest]
         public IEnumerator RangedUnit_KillsTenHealthTargetInThreeHits()
         {
-            yield return AssertKillsInThreeHits(AttackStyle.Ranged, typeof(RangedAttackState));
+            yield return AssertKillsInThreeHits(AttackStyle.Ranged);
         }
 
         [UnityTest]
@@ -48,7 +48,8 @@ namespace BagManagementBattler.Tests
             AcquireTargets(attacker, target);
 
             yield return new WaitForFixedUpdate();
-            Assert.That(attacker.StateMachine.CurrentState, Is.TypeOf<RangedAttackState>());
+            Assert.That(attacker.IsEngaged, Is.True);
+            Assert.That(attacker.WeaponDefinition.AttackStyle, Is.EqualTo(AttackStyle.Ranged));
             attacker.TakeDamage(10f);
             Assert.That(attacker.StateMachine.CurrentState, Is.TypeOf<DeathState>());
 
@@ -295,7 +296,8 @@ namespace BagManagementBattler.Tests
                 trace += $"\n enemy {Describe(enemy)}";
             }
 
-            Assert.That(melee.StateMachine.CurrentState, Is.TypeOf<MeleeAttackState>(), trace);
+            Assert.That(melee.IsEngaged, Is.True, trace);
+            Assert.That(melee.WeaponDefinition.AttackStyle, Is.EqualTo(AttackStyle.Melee), trace);
         }
 
         private static readonly Vector2 PrefabCapsule = new Vector2(0.25f, 0.6f);
@@ -329,7 +331,7 @@ namespace BagManagementBattler.Tests
             return weapon;
         }
 
-        private IEnumerator AssertKillsInThreeHits(AttackStyle style, System.Type expectedState)
+        private IEnumerator AssertKillsInThreeHits(AttackStyle style)
         {
             BagItemDefinition attackWeapon = CreateWeapon(style, 4f, 0.1f);
             BagItemDefinition passiveWeapon = CreateWeapon(AttackStyle.Melee, 1f, BagItemDefinition.NonLethalTestAttackCooldown);
@@ -338,7 +340,8 @@ namespace BagManagementBattler.Tests
             AcquireTargets(attacker, target);
 
             yield return new WaitForFixedUpdate();
-            Assert.That(attacker.StateMachine.CurrentState.GetType(), Is.EqualTo(expectedState));
+            Assert.That(attacker.IsEngaged, Is.True);
+            Assert.That(attacker.WeaponDefinition.AttackStyle, Is.EqualTo(style));
             for (int step = 0; step < 30 && !target.Health.IsDepleted; step++)
             {
                 yield return new WaitForFixedUpdate();

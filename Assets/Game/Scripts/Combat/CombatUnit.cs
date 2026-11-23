@@ -25,7 +25,6 @@ namespace BagManagementBattler.Combat
         private const float MaxSeparationShareOfSpeed = 0.5f;
         // A blocked unit whose sliding step is below this share of its speed waits instead.
         private const float WaitSlideShareOfSpeed = 0.5f;
-        private const float DeathReleaseDelay = 0.5f;
 
         private readonly List<SpriteRenderer> unitVisualRenderers =
             new List<SpriteRenderer>();
@@ -47,14 +46,10 @@ namespace BagManagementBattler.Combat
         private float bandMaxY = float.PositiveInfinity;
         private UnitSpawner ownerSpawner;
         private UnitStateMachine stateMachine;
-        private IdleState idleState;
         private WalkState walkState;
         private WaitingState waitingState;
-        private MeleeAttackState meleeAttackState;
-        private RangedAttackState rangedAttackState;
+        private AttackState attackState;
         private DeathState deathState;
-        private float nextAttackTime;
-        private float deathReleaseTime;
         private int successfulAttackCount;
 
         public UnitDefinition UnitDefinition { get; private set; }
@@ -69,8 +64,7 @@ namespace BagManagementBattler.Combat
         public Transform HandPoint => handPoint;
         public CombatUnit CurrentTarget => currentTarget;
         /// <summary>In attack range of the current target (with hysteresis); engaged units do not steer.</summary>
-        public bool IsEngaged => stateMachine?.CurrentState is MeleeAttackState ||
-                                 stateMachine?.CurrentState is RangedAttackState;
+        public bool IsEngaged => stateMachine?.CurrentState is AttackState;
         /// <summary>Engaged, or waiting behind a resting teammate nearer the target; resting units do not steer.</summary>
         public bool IsResting => IsEngaged || stateMachine?.CurrentState is WaitingState;
         public bool IsAlive => Health != null && !Health.IsDepleted;
@@ -80,6 +74,16 @@ namespace BagManagementBattler.Combat
         internal float HitFlashAmount => feedback != null ? feedback.HitFlashAmount : 0f;
         internal int SuccessfulAttackCount => successfulAttackCount;
         internal bool IsPlayingDeathVisual => feedback != null && feedback.IsPlayingDeath;
+        internal WalkState WalkState => walkState;
+        internal WaitingState WaitingState => waitingState;
+        internal AttackState AttackState => attackState;
+        internal bool HasValidTarget => IsValidTarget(currentTarget);
+        internal float CurrentTargetGap => HasValidTarget
+            ? EdgeGapTo(currentTarget)
+            : float.PositiveInfinity;
+        internal float EngagementReleaseRange => EngagementRange + engagementMargin;
+        internal bool IsTouchingRestingTeammate => touchingRestingTeammate;
+        internal float WaitSlideSpeedThreshold => MovementSpeed * WaitSlideShareOfSpeed;
 
         private void Awake()
         {
@@ -181,8 +185,6 @@ namespace BagManagementBattler.Combat
             touchingRestingTeammate = false;
             ClearNearbyOpponents();
             nextSeparationTime = 0f;
-            nextAttackTime = 0f;
-            deathReleaseTime = 0f;
             feedback.Initialize(body, minY, maxY);
             successfulAttackCount = 0;
             SetVisualFacing(UnitDefinition.Team == CombatTeam.Enemy ? -1f : 1f);
@@ -191,7 +193,7 @@ namespace BagManagementBattler.Combat
             Health = new Health(UnitDefinition.MaxHealth);
             Health.Depleted += HandleHealthDepleted;
             IsInitialized = true;
-            stateMachine.ChangeState(idleState);
+            stateMachine.ChangeState(walkState);
         }
 
         public void RefreshTargetNow()
@@ -202,16 +204,7 @@ namespace BagManagementBattler.Combat
                 return;
             }
 
-            CombatUnit nearest = FindNearestTarget();
-            if (nearest != currentTarget)
-            {
-                if (IsAlive)
-                {
-                    stateMachine.ChangeState(walkState);
-                }
-            }
-
-            currentTarget = nearest;
+            currentTarget = FindNearestTarget();
             nextTargetRefreshTime = Time.time + targetRefreshInterval;
         }
 
@@ -236,8 +229,6 @@ namespace BagManagementBattler.Combat
             touchingRestingTeammate = false;
             ClearNearbyOpponents();
             nextSeparationTime = 0f;
-            nextAttackTime = 0f;
-            deathReleaseTime = 0f;
             feedback.ResetForPool();
             successfulAttackCount = 0;
             UnitDefinition = null;
@@ -260,10 +251,6 @@ namespace BagManagementBattler.Combat
             }
 
             currentTarget = null;
-            if (IsAlive)
-            {
-                stateMachine.ChangeState(walkState);
-            }
             if (Time.time >= nextTargetRefreshTime)
             {
                 RefreshTargetNow();
@@ -336,130 +323,6 @@ namespace BagManagementBattler.Combat
             return distance.isValid ? distance.distance : float.PositiveInfinity;
         }
 
-        internal void EnterIdleState()
-        {
-            body.linearVelocity = Vector2.zero;
-        }
-
-        internal Vector2 TickIdleState()
-        {
-            stateMachine.ChangeState(walkState);
-            return TickWalkState();
-        }
-
-        internal void EnterWalkState()
-        {
-        }
-
-        internal Vector2 TickWalkState()
-        {
-            if (!IsValidTarget(currentTarget))
-            {
-                return AdvanceVelocity();
-            }
-
-            if (EdgeGapTo(currentTarget) <= EngagementRange)
-            {
-                EnterConfiguredAttackState();
-                return Vector2.zero;
-            }
-
-            Vector2 slide = ResolveChaseSlide();
-            if (touchingRestingTeammate &&
-                slide.magnitude < MovementSpeed * WaitSlideShareOfSpeed)
-            {
-                stateMachine.ChangeState(waitingState);
-                return Vector2.zero;
-            }
-
-            return slide;
-        }
-
-        internal void EnterWaitingState()
-        {
-        }
-
-        internal Vector2 TickWaitingState()
-        {
-            if (!IsValidTarget(currentTarget))
-            {
-                stateMachine.ChangeState(walkState);
-                return AdvanceVelocity();
-            }
-
-            if (EdgeGapTo(currentTarget) <= EngagementRange)
-            {
-                EnterConfiguredAttackState();
-                return Vector2.zero;
-            }
-
-            Vector2 slide = ResolveChaseSlide();
-            if (touchingRestingTeammate)
-            {
-                return Vector2.zero;
-            }
-
-            stateMachine.ChangeState(walkState);
-            return slide;
-        }
-
-        internal void EnterAttackState(AttackStyle attackStyle)
-        {
-            if (WeaponDefinition == null || WeaponDefinition.AttackStyle != attackStyle)
-            {
-                throw new InvalidOperationException("The attack state must match the equipped weapon style.");
-            }
-
-            body.linearVelocity = Vector2.zero;
-            nextAttackTime = Time.time + WeaponDefinition.AttackCooldown * 0.5f;
-        }
-
-        internal Vector2 TickAttackState(AttackStyle attackStyle)
-        {
-            if (!IsAlive)
-            {
-                return Vector2.zero;
-            }
-
-            if (WeaponDefinition.AttackStyle != attackStyle ||
-                !IsValidTarget(currentTarget) ||
-                EdgeGapTo(currentTarget) > EngagementRange + engagementMargin)
-            {
-                RetargetAndWalk();
-                return stateMachine.CurrentState is WalkState ? TickWalkState() : Vector2.zero;
-            }
-
-            if (Time.time >= nextAttackTime)
-            {
-                PerformAttack();
-                nextAttackTime += WeaponDefinition.AttackCooldown;
-            }
-
-            return Vector2.zero;
-        }
-
-        internal void EnterDeathState()
-        {
-            currentTarget = null;
-            body.linearVelocity = Vector2.zero;
-            separationVelocity = Vector2.zero;
-            crowdBlockDirection = Vector2.zero;
-            touchingRestingTeammate = false;
-            ClearNearbyOpponents();
-            deathReleaseTime = Time.time + DeathReleaseDelay;
-            feedback.PlayDeath(visualRoot, DeathReleaseDelay);
-        }
-
-        internal Vector2 TickDeathState()
-        {
-            if (ownerSpawner != null && Time.time >= deathReleaseTime)
-            {
-                ownerSpawner.Release(this);
-            }
-
-            return Vector2.zero;
-        }
-
         public void TakeDamage(float amount)
         {
             if (!IsInitialized || Health == null)
@@ -485,31 +348,21 @@ namespace BagManagementBattler.Combat
             feedback.BeginKnockback(direction, distance);
         }
 
-        private Vector2 AdvanceVelocity()
+        internal Vector2 AdvanceVelocity()
         {
             return new Vector2(Team == CombatTeam.Friendly ? MovementSpeed : -MovementSpeed, 0f);
         }
 
-        private Vector2 ResolveChaseSlide()
+        internal Vector2 ResolveChaseSlide()
         {
             Vector2 steer = (currentTarget.body.position - body.position).normalized * MovementSpeed;
             float into = Vector2.Dot(steer, crowdBlockDirection);
             return into > 0f ? steer - crowdBlockDirection * into : steer;
         }
 
-        private void EnterConfiguredAttackState()
-        {
-            stateMachine.ChangeState(
-                WeaponDefinition.AttackStyle == AttackStyle.Melee
-                    ? (IUnitState)meleeAttackState
-                    : rangedAttackState);
-        }
-
-        private void RetargetAndWalk()
+        internal void ClearTarget()
         {
             currentTarget = null;
-            stateMachine.ChangeState(walkState);
-            RefreshTargetNow();
         }
 
         private void HandleHealthDepleted()
@@ -517,7 +370,7 @@ namespace BagManagementBattler.Combat
             stateMachine.ChangeState(deathState);
         }
 
-        private void PerformAttack()
+        internal void PerformAttack()
         {
             CombatUnit primaryTarget = currentTarget;
             if (!IsAlive || !IsValidTarget(primaryTarget))
@@ -577,6 +430,29 @@ namespace BagManagementBattler.Combat
                 {
                     target.TakeDamage(WeaponDefinition.Damage);
                 }
+            }
+        }
+
+        internal void StopForDeath()
+        {
+            currentTarget = null;
+            body.linearVelocity = Vector2.zero;
+            separationVelocity = Vector2.zero;
+            crowdBlockDirection = Vector2.zero;
+            touchingRestingTeammate = false;
+            ClearNearbyOpponents();
+        }
+
+        internal void PlayDeathFeedback(float releaseDelay)
+        {
+            feedback.PlayDeath(visualRoot, releaseDelay);
+        }
+
+        internal void ReleaseToOwner()
+        {
+            if (ownerSpawner != null)
+            {
+                ownerSpawner.Release(this);
             }
         }
 
@@ -747,11 +623,9 @@ namespace BagManagementBattler.Combat
             }
 
             stateMachine = new UnitStateMachine();
-            idleState = new IdleState(this);
             walkState = new WalkState(this);
             waitingState = new WaitingState(this);
-            meleeAttackState = new MeleeAttackState(this);
-            rangedAttackState = new RangedAttackState(this);
+            attackState = new AttackState(this);
             deathState = new DeathState(this);
         }
 

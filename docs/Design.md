@@ -208,7 +208,7 @@ Every external asset gets a row in `docs/Credits.md` (name, author, license, URL
 | Flyweight via ScriptableObjects | `BagItemDefinition`, `UnitDefinition`, wave/shop/run definitions | shared immutable data, many instances |
 | Humble Object / model–view split | `BagGrid`+`BagManager` vs `BagBoardView`/`ItemContainerView` | logic testable without a scene |
 | Memento-style snapshot + rollback | `BagManager.DragSnapshot` | exact restore on cancel/invalid drop |
-| State pattern | unit states (Idle/Walk/MeleeAttack/RangedAttack/Death); game phases in `GameFlowController` | explicit transitions, no flag soup |
+| State pattern | unit states (Walk/Waiting/Attack/Death); game phases in `GameFlowController` | explicit transitions, no flag soup |
 | Object Pool | `UnitSpawner` | no per-spawn allocation in battle |
 | Value-object request | `ProductionRequest` | production decoupled from spawning; no live instance references |
 | Observer (C# events) | `Wallet.Changed`, `Health.Depleted`, `RunState.LivesChanged` → views/audio | UI reacts without gameplay knowing UI exists |
@@ -258,13 +258,13 @@ Namespaces: `BagManagementBattler.Bag`, `.Combat`, `.Flow`, `.Economy`, `.UI`, `
 |---|---|---|---|
 | `UnitDefinition`, `UnitCatalog` | SO | per-team/archetype/level body stats and visuals | done (HP: next) |
 | `CombatUnitLoadout` | value | unit def + weapon def → final stats | done |
-| `CombatUnit` | MB | one unit: initialize, own state machine, movement, targeting; mirrors its visual root for the enemy team; movement per 3.7 | movement, targeting, states and direct attacks done (3A.2–3A.4, M1-2); real State pattern: M1-2b |
+| `CombatUnit` | MB | one unit: initialize, coordinate its state machine, and provide movement, separation, sensing and attack operations; mirrors its visual root for the enemy team; movement per 3.7 | done (3A.2–3A.4, M1-2, M1-2b) |
 | `UnitVisualLayout` | static | visual sizing helper | done |
 | `BagProductionController` | MB | session lifecycle, ticking, forwards requests | done |
 | `UnitSpawner` | MB | pool, acquire/init/release, track active, recycle all; one instance per team (serialized `team`; `Spawn(CombatUnitLoadout)` rejects other teams) | rename + per-team done (M1-1, scene check passed); recycle all: M1-3 |
 | `TestEnemySpawner` | MB | debug fixture: spawns `enemyCount` copies of one enemy loadout, `spawnInterval` apart, spread across the band, through the enemy `UnitSpawner` | delete when `WaveRunner` lands |
 | `Health` | C# | current/max, damage, `Depleted` event | done (M1-2) |
-| `UnitStateMachine`, `IUnitState` + states | C# | Idle, Walk, Waiting, MeleeAttack, RangedAttack, Death | done as forwarders (M1-2); states own logic, one Attack state: M1-2b |
+| `UnitStateMachine`, `IUnitState` + states | C# | Walk, Waiting, Attack, Death; each state owns its behavior and transitions | done (M1-2b) |
 | `PlayerBase` | MB | base `Health`, enemy contact | next |
 | `WaveDefinition`, `WaveSpawnEntry` | SO / data | start time, enemy unit def, weapon def, count, interval, boss flag | planned |
 | `WaveRunner` | MB | runs one wave schedule through the enemy `UnitSpawner`, reports schedule complete | planned |

@@ -24,33 +24,32 @@
 ## Now
 
 - **Milestone:** M1 Combat (Nov 24–28)
-- **Current task:** M1-2b (Queue #1 below).
+- **Current task:** M1-3 (Queue #1 below).
 - **Status:** not started
 - **Owner:** —
-- **Last updated:** 2026-11-23 by Claude
+- **Last updated:** 2026-11-23 by Codex
 
 ## Handoff notes
 
-- 2026-11-23 Claude: M1-2 committed and pushed after the user's scene check (see Done log). Next is M1-2b. Open question before starting it: `CombatUnitCombatTests` names `MeleeAttackState`/`RangedAttackState` (3 asserts), so "one Attack state" and "tests unedited" conflict; raise it with the user first. Config values (speeds, rifle range 1) are testing values; Design §1.9 now says configs are authoritative until M3 balance, so don't sync them into the doc.
+- 2026-11-23 Codex: M1-2b scene check passed with unchanged behavior; closing in commit `M1-2b: real unit state pattern` and promoting M1-3. Removed Idle, consolidated melee/ranged into one config-driven `AttackState`, and moved behavior/transitions/timers into the states. Only the 3 approved class-name assertions changed. Tests this session: focused combat 11/11, focused movement + targeting 11/11, full EditMode 45/45, full PlayMode 27/27 — all passed.
+- 2026-11-23 Claude: M1-2 committed and pushed after the user's scene check (see Done log). Next is M1-2b. User decision 2026-11-23: the 3 asserts in `CombatUnitCombatTests` that name `MeleeAttackState`/`RangedAttackState` may be updated to the single `AttackState`; every other test stays unedited. Config values (speeds, rifle range 1) are testing values; Design §1.9 now says configs are authoritative until M3 balance, so don't sync them into the doc.
 
 ## Found, not fixed
 
 - `CrowbarLevel2` is still 3.4 s / range 0.7, but L1 is now 2 s / 0.15. L2 is slower and longer-ranged than L1, which breaks the 1.9 level rule (×0.85 → 1.7 s). Re-derive it when L2 matters (M3 content).
 - Separation can nudge a stopped unit just out of range (seen in the scene test: gap 0.152 vs range 0.15), so it steps back in on the next fixed step. Addressed by 3A.4 hysteresis (margin 0.05); recheck it in the 3A.4 scene check.
 - The soldier art exists twice: the separate `Assets/Game/Art/Soldier_Sprites/PNG/` files and `soldier_atlas_512.png`. The configs only use `PNG/`; decide whether to delete the atlas or switch to it (e.g. before the M3 content pass).
+- `CombatUnit` (~800 lines) should later split into `UnitTargeting`, `UnitMovement` and `UnitVisuals`, with `CombatUnit` coordinating. Do this after M2, when combat behavior is stable.
 
 ## Queue
 
-1. **M1-2b — real State pattern for unit states**
-   - **Why:** M1-2's state classes are one-line forwarders to `CombatUnit.Enter*/Tick*`; transitions are also forced from outside (`RefreshTargetNow`, `RefreshTargetIfNeeded`), and the two attack states differ only by an enum.
-   - **Scope:** each state class owns its own logic and transitions (Walk: advance/chase/wait trigger; Waiting: the 3A.4 rule; Attack: hit timing, range hysteresis, retarget; Death: release delay). One `AttackState` replaces Melee/Ranged and reads `AttackStyle` from the weapon. `CombatUnit` is the context: it exposes the data and helpers states need (target, gap, body, separation result, attack) and runs the machine; it keeps no per-state flags or `Enter*/Tick*` methods. Remove Idle, or give it a real purpose (e.g. the pooled/uninitialised state) and say which in the handoff.
-   - **Acceptance:** behaviour unchanged; every existing EditMode and PlayMode test passes **without editing the tests**. (Tests that name `MeleeAttackState`/`RangedAttackState` need a compatibility decision first: raise it in this file before changing anything.)
+1. **M1-3 — recycle safety, player base and smoke build**
+   - **Scope:** death → release at most once; `UnitSpawner.RecycleAll` (wave cleanup: release every active unit once, safe when a death release lands in the same frame); `PlayerBase` + contact damage; WebGL portrait smoke build.
 2. **3A.5 — attack slots and retarget** (rule: `docs/Design.md` §3.7)
    - **Scope:** 6–8 melee slots on a ring around each target; a melee unit claims the nearest free slot and steers to that point; no free slot → retarget to the nearest enemy that has one; wait only if no enemy has a free slot. Ranged units never take slots. Slots are released on death, retarget and pool release (release-once).
    - **Why:** the 3A.4 waiting rule chains through ranks, so later units wait behind the crowd instead of moving to another target (accepted trade-off for now).
    - **Acceptance:** evaluate after M1-2 with real kills; close 3A.5 without building it if crowds already resolve.
-3. M1-3 — death → release at most once; `UnitSpawner.RecycleAll` (wave cleanup: release every active unit once, safe when a death release lands in the same frame); `PlayerBase` + contact damage; WebGL portrait smoke build.
-4. **Asset/polish backlog** (`docs/Design.md` §1.12 feel; not yet scheduled, cut first if a milestone slips)
+3. **Asset/polish backlog** (`docs/Design.md` §1.12 feel; not yet scheduled, cut first if a milestone slips)
    - Death poof: pooled smoke particle on the Effects layer, triggered from the Death state through `UnitFeedback` (M1-2 has a placeholder squash + fade over the 0.5 s death delay).
 
 ## Done log
@@ -66,3 +65,4 @@
 | 3A.4 | crowd stability: engagement hysteresis, velocity smoothing, separation dead zone, opponent non-overlap (push + per-step guard), waiting behind resting teammates | commit "Task 3A.4: crowd stability" |
 | M1-1 | `SoldierSpawner` → `UnitSpawner` (GUID kept), one instance per team with a team check in `Spawn(CombatUnitLoadout)`, test enemy spawned through the enemy `UnitSpawner`, `BagProductionController.unitSpawner` (`FormerlySerializedAs`) | commit "M1-1: UnitSpawner per team" |
 | M1-2 | `Health`, unit state machine (forwarder states, see M1-2b), direct melee/ranged damage, death + 0.5 s pooled release with squash/fade, knockback/area hit, `SpriteFlash` material + MPB hit flash, `TestEnemySpawner` count/interval/band spread | commit "M1-2: health, states, direct attacks, death, hit flash" |
+| M1-2b | real State pattern: Walk/Waiting/Attack/Death own behavior and transitions; one config-driven Attack state; Idle removed | commit "M1-2b: real unit state pattern" |
