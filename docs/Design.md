@@ -98,7 +98,9 @@ Variety comes from head, weapon and stats, not scale. Bosses are scaled-up defau
 | Boss 1 (wave 5) | default enemy at 2× scale, gold crowbar | HP-sponge test with a big health bar |
 | Boss 2 (wave 10) | default enemy at 2× scale, gold rifle, Grunt escorts | sustained-output test |
 
-### 1.9 Starting numbers (tuning baseline, all in config assets)
+### 1.9 Starting numbers (targets; the config assets are authoritative)
+
+These are starting targets, not live values. During development the config assets under `Assets/Game/Configs` are authoritative and may hold testing values that differ from this table; do not sync them back here. Balance against these targets happens in M3.
 
 | Value | Start |
 |---|---|
@@ -121,7 +123,7 @@ Variety comes from head, weapon and stats, not scale. Bosses are scaled-up defau
 | Pistol | 3 | 0.8 s | 3.5 | 4.0 s | 1.0 |
 | Rifle | 4 | 0.6 s | 2.0 | 6.0 s | 0.85 |
 
-Range is edge to edge (see 3.7). Crowbar and Rifle range/production/speed are the tuned config values after the 3A.1 scene check (field units at 0.5 scale, collider 0.21 × 0.4; since 3A.3 the collider is 0.25 × 0.6). Damage and cooldown are not in config yet (M1). Knife and Pistol are not authored yet.
+Range is edge to edge (see 3.7). Unit health starts at 10 for friendly and enemy L1, ×1.7 per level. Knife and Pistol are not authored yet.
 
 ### 1.10 Waves and teaching
 
@@ -256,13 +258,13 @@ Namespaces: `BagManagementBattler.Bag`, `.Combat`, `.Flow`, `.Economy`, `.UI`, `
 |---|---|---|---|
 | `UnitDefinition`, `UnitCatalog` | SO | per-team/archetype/level body stats and visuals | done (HP: next) |
 | `CombatUnitLoadout` | value | unit def + weapon def → final stats | done |
-| `CombatUnit` | MB | one unit: initialize, own state machine, movement, targeting; mirrors its visual root for the enemy team; movement per 3.7 | movement and targeting done (3A.2–3A.4); states/attacks: M1-2 |
+| `CombatUnit` | MB | one unit: initialize, own state machine, movement, targeting; mirrors its visual root for the enemy team; movement per 3.7 | movement, targeting, states and direct attacks done (3A.2–3A.4, M1-2); real State pattern: M1-2b |
 | `UnitVisualLayout` | static | visual sizing helper | done |
 | `BagProductionController` | MB | session lifecycle, ticking, forwards requests | done |
 | `UnitSpawner` | MB | pool, acquire/init/release, track active, recycle all; one instance per team (serialized `team`; `Spawn(CombatUnitLoadout)` rejects other teams) | rename + per-team done (M1-1, scene check passed); recycle all: M1-3 |
-| `TestEnemySpawner` | MB | debug fixture: picks one enemy loadout and spawns it through the enemy `UnitSpawner` | delete when `WaveRunner` lands |
-| `Health` | C# | current/max, damage, `Depleted` event | next |
-| `UnitStateMachine`, `IUnitState` + 5 states | C# | Idle, Walk, MeleeAttack, RangedAttack, Death | next |
+| `TestEnemySpawner` | MB | debug fixture: spawns `enemyCount` copies of one enemy loadout, `spawnInterval` apart, spread across the band, through the enemy `UnitSpawner` | delete when `WaveRunner` lands |
+| `Health` | C# | current/max, damage, `Depleted` event | done (M1-2) |
+| `UnitStateMachine`, `IUnitState` + states | C# | Idle, Walk, Waiting, MeleeAttack, RangedAttack, Death | done as forwarders (M1-2); states own logic, one Attack state: M1-2b |
 | `PlayerBase` | MB | base `Health`, enemy contact | next |
 | `WaveDefinition`, `WaveSpawnEntry` | SO / data | start time, enemy unit def, weapon def, count, interval, boss flag | planned |
 | `WaveRunner` | MB | runs one wave schedule through the enemy `UnitSpawner`, reports schedule complete | planned |
@@ -292,7 +294,7 @@ Namespaces: `BagManagementBattler.Bag`, `.Combat`, `.Flow`, `.Economy`, `.UI`, `
 | Script | Responsibility | Status |
 |---|---|---|
 | `ShopView`, `HudView`, `ResultView`, `RunEndView`, `PauseView`, `SettingsView`, `MainMenuView`, `CreditsView`, `HintBannerView` | screens in 1.11 | planned |
-| `UnitFeedback` | hit flash (MaterialPropertyBlock), DOTween knockback/death; kills tweens on release | planned |
+| `UnitFeedback` | hit flash (MaterialPropertyBlock, `SpriteFlash` material), knockback, DOTween death squash + fade; kills tweens on release | done (M1-2); death poof: polish backlog |
 | `AudioPlayer` + `SoundLibrary` (SO) | plays named cues; referenced explicitly | planned |
 | `SettingsStore`, `ProgressStore` | PlayerPrefs read/write | planned |
 

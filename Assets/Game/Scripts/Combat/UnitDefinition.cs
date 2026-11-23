@@ -23,6 +23,7 @@ namespace BagManagementBattler.Combat
         [SerializeField] private Sprite headSprite;
         [SerializeField] private Sprite bodySprite;
         [SerializeField, Min(0.01f)] private float baseMovementSpeed = 1f;
+        [SerializeField, Min(0.01f)] private float maxHealth = 10f;
 
         public CombatTeam Team => team;
         public UnitArchetype Archetype => archetype;
@@ -30,6 +31,7 @@ namespace BagManagementBattler.Combat
         public Sprite HeadSprite => headSprite;
         public Sprite BodySprite => bodySprite;
         public float BaseMovementSpeed => baseMovementSpeed;
+        public float MaxHealth => maxHealth;
 
         public void Validate()
         {
@@ -53,6 +55,12 @@ namespace BagManagementBattler.Combat
                 throw new InvalidOperationException(
                     "A unit base movement speed must be finite and greater than zero.");
             }
+
+            if (!IsFinite(maxHealth) || maxHealth <= 0f)
+            {
+                throw new InvalidOperationException(
+                    "A unit maximum health must be finite and greater than zero.");
+            }
         }
 
         public static UnitDefinition CreateTransient(
@@ -61,7 +69,8 @@ namespace BagManagementBattler.Combat
             int level,
             float baseMovementSpeed,
             Sprite bodySprite = null,
-            Sprite headSprite = null)
+            Sprite headSprite = null,
+            float maxHealth = 10f)
         {
             UnitDefinition definition = CreateInstance<UnitDefinition>();
             definition.hideFlags = HideFlags.HideAndDontSave;
@@ -69,6 +78,7 @@ namespace BagManagementBattler.Combat
             definition.archetype = archetype;
             definition.level = level;
             definition.baseMovementSpeed = baseMovementSpeed;
+            definition.maxHealth = maxHealth;
             definition.bodySprite = bodySprite;
             definition.headSprite = headSprite;
             definition.Validate();

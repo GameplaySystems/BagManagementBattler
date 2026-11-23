@@ -10,6 +10,22 @@ namespace BagManagementBattler.Tests
     {
         private readonly List<Object> createdObjects = new List<Object>();
 
+        [Test]
+        public void TestEnemySpawner_SpreadsEnemiesEvenlyInsideBand()
+        {
+            float previous = float.NegativeInfinity;
+            for (int index = 0; index < 8; index++)
+            {
+                float? y = TestEnemySpawner.SpreadY(index, 8, -1.2f, 1.6f);
+                Assert.That(y, Is.Not.Null);
+                Assert.That(y.Value, Is.InRange(-1.2f, 1.6f));
+                Assert.That(y.Value, Is.GreaterThan(previous + 0.34f));
+                previous = y.Value;
+            }
+
+            Assert.That(TestEnemySpawner.SpreadY(0, 8, float.NegativeInfinity, 1f), Is.Null);
+        }
+
         [TearDown]
         public void TearDown()
         {

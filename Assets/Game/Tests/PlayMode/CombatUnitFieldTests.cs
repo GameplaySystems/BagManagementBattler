@@ -17,7 +17,8 @@ namespace BagManagementBattler.Tests
             UnitDefinition friendlyDefinition = UnitDefinition.CreateTransient(
                 CombatTeam.Friendly, UnitArchetype.Basic, 1, 1f);
             BagItemDefinition weapon = BagItemDefinition.CreateTransientWeapon(
-                "weapon.test", 1, 1f, 1f, 0.5f, new[] { Vector2Int.zero });
+                "weapon.test", 1, 1f, 1f, 0.5f, new[] { Vector2Int.zero },
+                attackCooldown: BagItemDefinition.NonLethalTestAttackCooldown);
             GameObject unitObject = new GameObject("Mirrored Unit");
             CombatUnit unit = unitObject.AddComponent<CombatUnit>();
 
@@ -48,7 +49,8 @@ namespace BagManagementBattler.Tests
             UnitDefinition enemyDefinition = UnitDefinition.CreateTransient(
                 CombatTeam.Enemy, UnitArchetype.Basic, 1, 1f);
             BagItemDefinition weapon = BagItemDefinition.CreateTransientWeapon(
-                "weapon.test", 1, 1f, 1f, 0.5f, new[] { Vector2Int.zero });
+                "weapon.test", 1, 1f, 1f, 0.5f, new[] { Vector2Int.zero },
+                attackCooldown: BagItemDefinition.NonLethalTestAttackCooldown);
             CombatUnit friendly = CreateUnit("Friendly Edge Unit", friendlyDefinition, weapon, -0.4f);
             CombatUnit enemy = CreateUnit("Enemy Edge Unit", enemyDefinition, weapon, 0.4f);
 
@@ -85,7 +87,8 @@ namespace BagManagementBattler.Tests
             BagItemDefinition soldier = BagItemDefinition.CreateTransientSoldier(
                 "soldier", 1, unitDefinition, new[] { Vector2Int.zero });
             BagItemDefinition weapon = BagItemDefinition.CreateTransientWeapon(
-                "weapon.test", 1, 1f, 1f, 0.5f, new[] { Vector2Int.zero });
+                "weapon.test", 1, 1f, 1f, 0.5f, new[] { Vector2Int.zero },
+                attackCooldown: BagItemDefinition.NonLethalTestAttackCooldown);
 
             GameObject prefabObject = new GameObject("Separation Prefab");
             CombatUnit prefab = prefabObject.AddComponent<CombatUnit>();

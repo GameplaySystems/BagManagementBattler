@@ -11,6 +11,12 @@ namespace BagManagementBattler.Bag
         Weapon
     }
 
+    public enum AttackStyle
+    {
+        Melee,
+        Ranged
+    }
+
     [Serializable]
     public sealed class BagItemVisualPart
     {
@@ -38,6 +44,16 @@ namespace BagManagementBattler.Bag
         private float movementSpeedMultiplier = 1f;
         [SerializeField, Tooltip("Used only when Role is Weapon.")]
         private float engagementRange = 0.75f;
+        [SerializeField, Tooltip("Used only when Role is Weapon."), Min(0.01f)]
+        private float damage = 1f;
+        [SerializeField, Tooltip("Used only when Role is Weapon."), Min(0.01f)]
+        private float attackCooldown = 1f;
+        [SerializeField, Tooltip("Used only when Role is Weapon.")]
+        private AttackStyle attackStyle;
+        [SerializeField, Tooltip("Used only when Role is Weapon."), Min(0f)]
+        private float knockbackDistance;
+        [SerializeField, Tooltip("Used only when Role is Weapon. Zero damages only the target."), Min(0f)]
+        private float areaHitRadius;
         [SerializeField] private List<Vector2Int> footprint = new List<Vector2Int> { Vector2Int.zero };
         [SerializeField] private Sprite iconSprite;
         [SerializeField] private Color itemColor = Color.white;
@@ -57,6 +73,11 @@ namespace BagManagementBattler.Bag
         public UnitDefinition UnitDefinition => unitDefinition;
         public float MovementSpeedMultiplier => movementSpeedMultiplier;
         public float EngagementRange => engagementRange;
+        public float Damage => damage;
+        public float AttackCooldown => attackCooldown;
+        public AttackStyle AttackStyle => attackStyle;
+        public float KnockbackDistance => knockbackDistance;
+        public float AreaHitRadius => areaHitRadius;
         public IReadOnlyList<Vector2Int> Footprint => footprint;
         public Sprite IconSprite => iconSprite;
         public Color ItemColor => itemColor;
@@ -115,6 +136,17 @@ namespace BagManagementBattler.Bag
             }
 
             if (role == BagItemRole.Weapon &&
+                (!IsFinite(damage) || damage <= 0f ||
+                 !IsFinite(attackCooldown) || attackCooldown <= 0f ||
+                 !Enum.IsDefined(typeof(AttackStyle), attackStyle) ||
+                 !IsFinite(knockbackDistance) || knockbackDistance < 0f ||
+                 !IsFinite(areaHitRadius) || areaHitRadius < 0f))
+            {
+                throw new InvalidOperationException(
+                    "A weapon requires finite positive damage/cooldown, a known attack style, and finite non-negative knockback/area values.");
+            }
+
+            if (role == BagItemRole.Weapon &&
                 (!IsFinite(equippedLocalPosition.x) ||
                  !IsFinite(equippedLocalPosition.y) ||
                  !IsFinite(equippedLocalRotationDegrees) ||
@@ -142,6 +174,9 @@ namespace BagManagementBattler.Bag
             }
         }
 
+        /// <summary>Test cooldown long enough that a fixture weapon never lands a hit (first hit at half of it).</summary>
+        public const float NonLethalTestAttackCooldown = 1000f;
+
         public static BagItemDefinition CreateTransient(
             string itemTypeId,
             IEnumerable<Vector2Int> footprint)
@@ -163,6 +198,11 @@ namespace BagManagementBattler.Bag
                 CreateFixtureFriendlyUnit(),
                 1f,
                 0.75f,
+                1f,
+                1f,
+                AttackStyle.Melee,
+                0f,
+                0f,
                 footprint,
                 nextLevelDefinition);
         }
@@ -183,6 +223,11 @@ namespace BagManagementBattler.Bag
                 role == BagItemRole.Soldier ? CreateFixtureFriendlyUnit() : null,
                 1f,
                 0.75f,
+                1f,
+                1f,
+                AttackStyle.Melee,
+                0f,
+                0f,
                 footprint,
                 nextLevelDefinition);
         }
@@ -213,6 +258,11 @@ namespace BagManagementBattler.Bag
                 configuredUnitDefinition,
                 1f,
                 0.75f,
+                1f,
+                1f,
+                AttackStyle.Melee,
+                0f,
+                0f,
                 footprint,
                 nextLevelDefinition);
         }
@@ -224,7 +274,12 @@ namespace BagManagementBattler.Bag
             float movementSpeedMultiplier,
             float engagementRange,
             IEnumerable<Vector2Int> footprint,
-            BagItemDefinition nextLevelDefinition = null)
+            BagItemDefinition nextLevelDefinition = null,
+            float damage = 1f,
+            float attackCooldown = 1f,
+            AttackStyle attackStyle = AttackStyle.Melee,
+            float knockbackDistance = 0f,
+            float areaHitRadius = 0f)
         {
             return CreateTransientConfigured(
                 itemTypeId,
@@ -234,6 +289,11 @@ namespace BagManagementBattler.Bag
                 null,
                 movementSpeedMultiplier,
                 engagementRange,
+                damage,
+                attackCooldown,
+                attackStyle,
+                knockbackDistance,
+                areaHitRadius,
                 footprint,
                 nextLevelDefinition);
         }
@@ -246,6 +306,11 @@ namespace BagManagementBattler.Bag
             UnitDefinition unitDefinition,
             float movementSpeedMultiplier,
             float engagementRange,
+            float damage,
+            float attackCooldown,
+            AttackStyle attackStyle,
+            float knockbackDistance,
+            float areaHitRadius,
             IEnumerable<Vector2Int> footprint,
             BagItemDefinition nextLevelDefinition)
         {
@@ -264,6 +329,11 @@ namespace BagManagementBattler.Bag
                 unitDefinition,
                 movementSpeedMultiplier,
                 engagementRange,
+                damage,
+                attackCooldown,
+                attackStyle,
+                knockbackDistance,
+                areaHitRadius,
                 footprint,
                 nextLevelDefinition);
             return definition;
@@ -277,6 +347,11 @@ namespace BagManagementBattler.Bag
             UnitDefinition configuredUnitDefinition,
             float configuredMovementSpeedMultiplier,
             float configuredEngagementRange,
+            float configuredDamage,
+            float configuredAttackCooldown,
+            AttackStyle configuredAttackStyle,
+            float configuredKnockbackDistance,
+            float configuredAreaHitRadius,
             IEnumerable<Vector2Int> configuredFootprint,
             BagItemDefinition configuredNextLevelDefinition)
         {
@@ -292,6 +367,11 @@ namespace BagManagementBattler.Bag
             unitDefinition = configuredUnitDefinition;
             movementSpeedMultiplier = configuredMovementSpeedMultiplier;
             engagementRange = configuredEngagementRange;
+            damage = configuredDamage;
+            attackCooldown = configuredAttackCooldown;
+            attackStyle = configuredAttackStyle;
+            knockbackDistance = configuredKnockbackDistance;
+            areaHitRadius = configuredAreaHitRadius;
             nextLevelDefinition = configuredNextLevelDefinition;
             footprint = new List<Vector2Int>();
 

@@ -26,6 +26,8 @@ namespace BagManagementBattler.Combat
         public int AvailableCount => availableUnits.Count;
         public IReadOnlyCollection<CombatUnit> ActiveUnits => activeUnits;
         public bool IsInitialized => initialized;
+        public float BattlefieldMinY => battlefieldMinY;
+        public float BattlefieldMaxY => battlefieldMaxY;
 
         private void Awake()
         {
@@ -89,7 +91,8 @@ namespace BagManagementBattler.Combat
             }
         }
 
-        public CombatUnit Spawn(CombatUnitLoadout loadout)
+        /// <param name="spawnY">Optional world Y (clamped to the band); omitted, units cycle the spawn lanes.</param>
+        public CombatUnit Spawn(CombatUnitLoadout loadout, float? spawnY = null)
         {
             EnsureInitialized();
             if (loadout.UnitDefinition == null || loadout.UnitDefinition.Team != team)
@@ -103,11 +106,18 @@ namespace BagManagementBattler.Combat
             // Lanes cycle 0, +1, -1 so units spawned together never start stacked.
             int lane = spawnCount++ % 3;
             float laneOffset = lane == 0 ? 0f : (lane == 1 ? spawnLaneSpacing : -spawnLaneSpacing);
+            Vector3 position = spawnAnchor.position + Vector3.up * laneOffset;
+            if (spawnY.HasValue)
+            {
+                position.y = spawnY.Value;
+            }
+
             unit.Initialize(
                 loadout,
-                spawnAnchor.position + Vector3.up * laneOffset,
+                position,
                 battlefieldMinY,
-                battlefieldMaxY);
+                battlefieldMaxY,
+                this);
             activeUnits.Add(unit);
             unit.gameObject.SetActive(true);
             return unit;

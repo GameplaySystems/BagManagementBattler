@@ -17,7 +17,8 @@ namespace BagManagementBattler.Tests
             UnitDefinition enemyDefinition = UnitDefinition.CreateTransient(
                 CombatTeam.Enemy, UnitArchetype.Basic, 1, 1f);
             BagItemDefinition weapon = BagItemDefinition.CreateTransientWeapon(
-                "weapon.test", 1, 1f, 1f, 0.5f, new[] { Vector2Int.zero });
+                "weapon.test", 1, 1f, 1f, 0.5f, new[] { Vector2Int.zero },
+                attackCooldown: BagItemDefinition.NonLethalTestAttackCooldown);
 
             GameObject friendlyObject = new GameObject("Friendly Test Unit");
             CombatUnit friendly = friendlyObject.AddComponent<CombatUnit>();

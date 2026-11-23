@@ -18,8 +18,13 @@ MonoBehaviour:
   role: 1
   productionDurationSeconds: 2
   unitDefinition: {fileID: 0}
-  movementSpeedMultiplier: 1
+  movementSpeedMultiplier: 0.5
   engagementRange: 0.15
+  damage: 6
+  attackCooldown: 1
+  attackStyle: 0
+  knockbackDistance: 0
+  areaHitRadius: 0
   footprint:
   - {x: 0, y: 0}
   iconSprite: {fileID: -6321939147899075484, guid: f9410564c377b664b9a73fe705f54ca3, type: 3}

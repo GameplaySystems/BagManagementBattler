@@ -44,6 +44,7 @@ GameObject:
   - component: {fileID: 4797742275312831351}
   - component: {fileID: 4979877340442591965}
   - component: {fileID: 5512093847261043712}
+  - component: {fileID: 1840331172593004765}
   m_Layer: 0
   m_Name: CombatUnit
   m_TagString: Untagged
@@ -193,3 +194,16 @@ SortingGroup:
   m_SortingLayer: 2
   m_SortingOrder: 0
   m_SortAtRoot: 0
+--- !u!114 &1840331172593004765
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6130577527775883339}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 50ff0880b3cf2cc4f8c01ce2bcf58c39, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: BagManagementBattler.Runtime::BagManagementBattler.Combat.UnitFeedback
+  flashMaterial: {fileID: 2100000, guid: c2fc034e1b81868144b59a59f1579c25, type: 2}

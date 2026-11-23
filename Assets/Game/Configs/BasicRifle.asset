@@ -18,8 +18,13 @@ MonoBehaviour:
   role: 1
   productionDurationSeconds: 6
   unitDefinition: {fileID: 0}
-  movementSpeedMultiplier: 0.85
+  movementSpeedMultiplier: 0.35
   engagementRange: 1
+  damage: 4
+  attackCooldown: 0.6
+  attackStyle: 1
+  knockbackDistance: 0
+  areaHitRadius: 0
   footprint:
   - {x: 0, y: 0}
   - {x: 1, y: 0}

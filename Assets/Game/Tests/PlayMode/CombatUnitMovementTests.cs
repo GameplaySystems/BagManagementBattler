@@ -38,7 +38,8 @@ namespace BagManagementBattler.Tests
                 1f,
                 1f,
                 0.75f,
-                new[] { Vector2Int.zero });
+                new[] { Vector2Int.zero },
+                attackCooldown: BagItemDefinition.NonLethalTestAttackCooldown);
 
             GameObject prefabObject = new GameObject("Combat Soldier Prefab");
             CombatUnit prefab = prefabObject.AddComponent<CombatUnit>();
@@ -348,7 +349,8 @@ namespace BagManagementBattler.Tests
             UnitDefinition definition = UnitDefinition.CreateTransient(
                 team, UnitArchetype.Basic, 1, 1f);
             BagItemDefinition weapon = BagItemDefinition.CreateTransientWeapon(
-                "weapon.melee.test", 1, 1f, 1f, MeleeRange, new[] { Vector2Int.zero });
+                "weapon.melee.test", 1, 1f, 1f, MeleeRange, new[] { Vector2Int.zero },
+                attackCooldown: BagItemDefinition.NonLethalTestAttackCooldown);
             return new CombatUnitLoadout(definition, weapon);
         }
 

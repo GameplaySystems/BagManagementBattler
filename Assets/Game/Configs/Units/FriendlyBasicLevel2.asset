@@ -18,3 +18,4 @@ MonoBehaviour:
   headSprite: {fileID: -5986225815814414787, guid: 1d3f98efb132904489e12a56e7a1abf3, type: 3}
   bodySprite: {fileID: 1424989993188794941, guid: 8778058061a657b4a8b8f9ef34acf5ec, type: 3}
   baseMovementSpeed: 1
+  maxHealth: 17

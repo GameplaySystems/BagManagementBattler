@@ -84,9 +84,14 @@ namespace BagManagementBattler.Tests
                 yield return null;
             }
 
+            // Combat is live here, so units may fight and die: check each unit's loadout as soon as
+            // it is produced, never targeting or positions.
+            BagItemDefinition soldierDefinition = FindSoldierDefinition();
             Assert.That(spawner.ActiveCount, Is.EqualTo(1));
             CombatUnit crowbarUnit = FindActiveUnit(spawner, "weapon.crowbar.basic");
             Assert.That(crowbarUnit, Is.Not.Null);
+            AssertProducedLoadout(crowbarUnit, soldierDefinition);
+            BagItemDefinition crowbarDefinition = crowbarUnit.WeaponDefinition;
 
             CombatUnit rifleUnit = null;
             while (rifleUnit == null && Time.time < deadline)
@@ -96,34 +101,18 @@ namespace BagManagementBattler.Tests
             }
 
             Assert.That(rifleUnit, Is.Not.Null);
+            AssertProducedLoadout(rifleUnit, soldierDefinition);
+            // GameScene's debug enemy fixture spawns a stream (8 at 1.5 s), not a single enemy.
+            Assert.That(enemySpawner.SpawnedCount, Is.InRange(2, 8));
+            Assert.That(rifleUnit.WeaponDefinition, Is.Not.SameAs(crowbarDefinition));
             List<CombatUnit> producedUnits =
                 new List<CombatUnit>(spawner.ActiveUnits);
             foreach (CombatUnit unit in producedUnits)
             {
-                AssertConfiguredWeaponVisual(unit);
-                Assert.That(unit.VisualRoot.localScale.x, Is.GreaterThan(0f));
+                AssertProducedLoadout(unit, soldierDefinition);
             }
 
-            yield return new WaitForFixedUpdate();
-            yield return new WaitForFixedUpdate();
-
-            // The first crowbar has had time to close in and stop at its edge-to-edge range.
-            Assert.That(rifleUnit.CurrentTarget, Is.SameAs(enemyUnit));
-            Assert.That(enemyUnit.CurrentTarget, Is.Not.Null);
-            Assert.That(crowbarUnit.CurrentTarget, Is.SameAs(enemyUnit));
-            // Later crowbars crowd in and their separation may push the stopped one (at most half
-            // its speed), so check "not steering" and "in range" instead of zero velocity.
-            Assert.That(
-                crowbarUnit.Body.linearVelocity.magnitude,
-                Is.LessThanOrEqualTo(crowbarUnit.MovementSpeed * 0.5f + 0.001f));
-            float crowbarEdgeGap = crowbarUnit.EdgeGapTo(enemyUnit);
-            Assert.That(crowbarEdgeGap, Is.InRange(-0.1f, crowbarUnit.EngagementRange + 0.03f));
             int pooledCount = spawner.ActiveCount + spawner.AvailableCount;
-
-            UnitDefinition unitDefinition = rifleUnit.UnitDefinition;
-            BagItemDefinition soldierDefinition = FindSoldierDefinition();
-            Assert.That(soldierDefinition.UnitDefinition, Is.SameAs(unitDefinition));
-            BagItemDefinition crowbarDefinition = crowbarUnit.WeaponDefinition;
             controller.EndProduction();
             yield return null;
             Assert.That(rifleFill.enabled, Is.False);
@@ -155,6 +144,23 @@ namespace BagManagementBattler.Tests
             {
                 Assert.That(spawner.Release(reusedUnit), Is.True);
             }
+        }
+
+        private static void AssertProducedLoadout(CombatUnit unit, BagItemDefinition soldierDefinition)
+        {
+            AssertConfiguredWeaponVisual(unit);
+            Assert.That(unit.VisualRoot.localScale.x, Is.GreaterThan(0f));
+            Assert.That(unit.UnitDefinition, Is.SameAs(soldierDefinition.UnitDefinition));
+            BagItemDefinition weapon = unit.WeaponDefinition;
+            Assert.That(
+                weapon.ItemTypeId,
+                Is.EqualTo("weapon.crowbar.basic").Or.EqualTo("weapon.rifle.basic"));
+            Assert.That(weapon.AttackStyle, Is.EqualTo(
+                weapon.ItemTypeId == "weapon.crowbar.basic" ? AttackStyle.Melee : AttackStyle.Ranged));
+            Assert.That(unit.MovementSpeed, Is.EqualTo(
+                unit.UnitDefinition.BaseMovementSpeed * weapon.MovementSpeedMultiplier).Within(0.0001f));
+            Assert.That(unit.EngagementRange, Is.EqualTo(weapon.EngagementRange));
+            Assert.That(unit.Health.Max, Is.EqualTo(unit.UnitDefinition.MaxHealth));
         }
 
         private static CombatUnit FindActiveUnit(UnitSpawner spawner, string weaponTypeId)
