@@ -258,15 +258,15 @@ Namespaces: `BagManagementBattler.Bag`, `.Combat`, `.Flow`, `.Economy`, `.UI`, `
 |---|---|---|---|
 | `UnitDefinition`, `UnitCatalog` | SO | per-team/archetype/level body stats and visuals | done (HP: next) |
 | `CombatUnitLoadout` | value | unit def + weapon def → final stats | done |
-| `ICombatTarget` | interface | shared position, collider, team, targetability and damage contract for units and the player base | next |
+| `ICombatTarget` | interface | shared position, collider, team, targetability and damage contract for units and the player base | done (M1-3) |
 | `CombatUnit` | MB | one unit: initialize, coordinate its state machine, and provide movement, separation, sensing and attack operations; implements `ICombatTarget`; mirrors its visual root for the enemy team; movement per 3.7 | done (3A.2–3A.4, M1-2, M1-2b) |
 | `UnitVisualLayout` | static | visual sizing helper | done |
 | `BagProductionController` | MB | session lifecycle, ticking, forwards requests | done |
-| `UnitSpawner` | MB | pool, acquire/init/release, track active, recycle all; one instance per team (serialized `team`; `Spawn(CombatUnitLoadout)` rejects other teams) | rename + per-team done (M1-1, scene check passed); recycle all: M1-3 |
+| `UnitSpawner` | MB | pool, acquire/init/release, track active, recycle all; one instance per team (serialized `team`; `Spawn(CombatUnitLoadout)` rejects other teams) | done (M1-1, M1-3) |
 | `TestEnemySpawner` | MB | debug fixture: spawns `enemyCount` copies of one enemy loadout, `spawnInterval` apart, spread across the band, through the enemy `UnitSpawner` | delete when `WaveRunner` lands |
 | `Health` | C# | current/max, damage, `Depleted` event | done (M1-2) |
 | `UnitStateMachine`, `IUnitState` + states | C# | Walk, Waiting, Attack, Death; each state owns its behavior and transitions | done (M1-2b) |
-| `PlayerBase` | MB | friendly `ICombatTarget` with base `Health` and depletion event; no loss flow until M2 | next |
+| `PlayerBase` | MB | friendly `ICombatTarget` with base `Health` and depletion event; no loss flow until M2 | done (M1-3) |
 | `WaveDefinition`, `WaveSpawnEntry` | SO / data | start time, enemy unit def, weapon def, count, interval, boss flag | planned |
 | `WaveRunner` | MB | runs one wave schedule through the enemy `UnitSpawner`, reports schedule complete | planned |
 
@@ -296,7 +296,7 @@ Namespaces: `BagManagementBattler.Bag`, `.Combat`, `.Flow`, `.Economy`, `.UI`, `
 |---|---|---|
 | `ShopView`, `HudView`, `ResultView`, `RunEndView`, `PauseView`, `SettingsView`, `MainMenuView`, `CreditsView`, `HintBannerView` | screens in 1.11 | planned |
 | `UnitFeedback` | hit flash (MaterialPropertyBlock, `SpriteFlash` material), knockback, DOTween death squash + fade; kills tweens on release | done (M1-2); death poof: polish backlog |
-| `PlayerBaseHealthBar` | MB | simple world-space base-health display above the tent | next |
+| `PlayerBaseHealthBar` | MB | simple world-space base-health display above the tent | done (M1-3) |
 | `AudioPlayer` + `SoundLibrary` (SO) | plays named cues; referenced explicitly | planned |
 | `SettingsStore`, `ProgressStore` | PlayerPrefs read/write | planned |
 

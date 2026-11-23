@@ -23,14 +23,16 @@
 
 ## Now
 
-- **Milestone:** M1 Combat (Nov 24–28)
-- **Current task:** M1-3 (Queue #1 below).
-- **Status:** blocked — steps 1–3 complete; WebGL module missing
-- **Owner:** Codex
+- **Milestone:** M1 Combat complete; next task is combat follow-up 3A.5
+- **Current task:** 3A.5 (Queue #1 below).
+- **Status:** ready
+- **Owner:** unassigned
 - **Last updated:** 2026-11-23 by Codex
 
 ## Handoff notes
 
+- 2026-11-23 Codex: User confirmed the M1-3 WebGL browser check. Closing M1-3 in commit `M1-3 step 4: WebGL portrait smoke build`, pushing it, and promoting 3A.5. Step 4 verification this session: Unity WebGL build exit 0 / `Build Finished, Result: Success`; served output returned HTTP 200; browser canvas 540×960, loading overlay hidden, active combat visible, 0 console warnings/errors. Unit suites not rerun for the Player Settings/editor-build-only step.
+- 2026-11-23 Codex: M1-3 step 4 complete after Unity 6000.3.17f1's `Web` module was installed (`WebGLSupport` playback engine is present). Set Web canvas 540×960 and enabled decompression fallback; `GameScene` is the only enabled build scene. Added minimal `WebGLBuild.Build` for reproducible CLI builds because Unity 6000.3.17f1 rejects direct `-build` without a saved Build Profile. Final unrestricted incremental build: exit 0, `Build Finished, Result: Success`; output is under `Builds/WebGL`. Served with `uv run python -m http.server 8000 --directory Builds/WebGL`; browser smoke passed at 540×960 with the loading overlay hidden, active combat visibly running, and 0 console warnings/errors. Build/log artifacts are ignored; intended uncommitted files are `ProjectSettings/ProjectSettings.asset`, `Assets/Editor.meta`, `Assets/Editor/WebGLBuild.cs` + meta, and this handoff.
 - 2026-11-23 Codex: M1-3 steps 1–3 complete under the revised siege design and included in the user-requested commit/push from `9d9168a`. Added idempotent `UnitSpawner.RecycleAll` plus same-frame death/cleanup coverage. Added minimal `ICombatTarget` implemented by `CombatUnit` and the 100-HP `PlayerBase`: enemies preserve nearest-friendly-unit priority, fall back to the base only with no friendly unit target, then use the same chase/range/`AttackState`/weapon damage/cooldown and remain active; friendly units cannot target their base. Added `PlayerBaseHealthBar` as a separate world-space presentation component. Updated Design §1.9, script map, movement/base rules and M1 exit wording. Final tests: focused UnitSpawner 6/6, release-once 1/1, PlayerBase 5/5, combined base + targeting + movement + combat 27/27, destroyed-target regression 1/1, scene wiring 1/1; full EditMode 46/46 and PlayMode 33/33 — all passed. `git diff --check` clean. Step 4 remains blocked because Unity 6000.3.17f1 has no `WebGLSupport` playback engine; Player Settings/build remain unattempted.
 - 2026-11-23 Codex: M1-2b scene check passed with unchanged behavior; closing in commit `M1-2b: real unit state pattern` and promoting M1-3. Removed Idle, consolidated melee/ranged into one config-driven `AttackState`, and moved behavior/transitions/timers into the states. Only the 3 approved class-name assertions changed. Tests this session: focused combat 11/11, focused movement + targeting 11/11, full EditMode 45/45, full PlayMode 27/27 — all passed.
 - 2026-11-23 Claude: M1-2 committed and pushed after the user's scene check (see Done log). Next is M1-2b. User decision 2026-11-23: the 3 asserts in `CombatUnitCombatTests` that name `MeleeAttackState`/`RangedAttackState` may be updated to the single `AttackState`; every other test stays unedited. Config values (speeds, rifle range 1) are testing values; Design §1.9 now says configs are authoritative until M3 balance, so don't sync them into the doc.
@@ -44,13 +46,11 @@
 
 ## Queue
 
-1. **M1-3 — recycle safety, player base and smoke build**
-   - **Scope:** death → release at most once; `UnitSpawner.RecycleAll` (wave cleanup: release every active unit once, safe when a death release lands in the same frame); `PlayerBase` siege through shared combat-target rules + world-space health bar; WebGL portrait smoke build.
-2. **3A.5 — attack slots and retarget** (rule: `docs/Design.md` §3.7)
+1. **3A.5 — attack slots and retarget** (rule: `docs/Design.md` §3.7)
    - **Scope:** 6–8 melee slots on a ring around each target; a melee unit claims the nearest free slot and steers to that point; no free slot → retarget to the nearest enemy that has one; wait only if no enemy has a free slot. Ranged units never take slots. Slots are released on death, retarget and pool release (release-once).
    - **Why:** the 3A.4 waiting rule chains through ranks, so later units wait behind the crowd instead of moving to another target (accepted trade-off for now).
    - **Acceptance:** evaluate after M1-2 with real kills; close 3A.5 without building it if crowds already resolve.
-3. **Asset/polish backlog** (`docs/Design.md` §1.12 feel; not yet scheduled, cut first if a milestone slips)
+2. **Asset/polish backlog** (`docs/Design.md` §1.12 feel; not yet scheduled, cut first if a milestone slips)
    - Death poof: pooled smoke particle on the Effects layer, triggered from the Death state through `UnitFeedback` (M1-2 has a placeholder squash + fade over the 0.5 s death delay).
 
 ## Done log
@@ -67,3 +67,4 @@
 | M1-1 | `SoldierSpawner` → `UnitSpawner` (GUID kept), one instance per team with a team check in `Spawn(CombatUnitLoadout)`, test enemy spawned through the enemy `UnitSpawner`, `BagProductionController.unitSpawner` (`FormerlySerializedAs`) | commit "M1-1: UnitSpawner per team" |
 | M1-2 | `Health`, unit state machine (forwarder states, see M1-2b), direct melee/ranged damage, death + 0.5 s pooled release with squash/fade, knockback/area hit, `SpriteFlash` material + MPB hit flash, `TestEnemySpawner` count/interval/band spread | commit "M1-2: health, states, direct attacks, death, hit flash" |
 | M1-2b | real State pattern: Walk/Waiting/Attack/Death own behavior and transitions; one config-driven Attack state; Idle removed | commit "M1-2b: real unit state pattern" |
+| M1-3 | release-once + `RecycleAll`; shared unit/base targeting and base health bar; portrait 540×960 WebGL build verified in browser | commits `349d09f` + "M1-3 step 4: WebGL portrait smoke build" |
